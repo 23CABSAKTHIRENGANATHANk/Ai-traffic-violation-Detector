@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 
 const Sidebar = () => {
     const menuItems = [
-        { path: '/', name: 'Dashboard', icon: <FaChartPie /> },
+        { path: '/dashboard', name: 'Dashboard', icon: <FaChartPie /> },
         { path: '/live', name: 'Violation Detection', icon: <FaVideo /> },
         { path: '/challans', name: 'E-Challans', icon: <FaFileInvoice /> },
         { path: '/admin', name: 'Admin Panel', icon: <FaUserShield /> },

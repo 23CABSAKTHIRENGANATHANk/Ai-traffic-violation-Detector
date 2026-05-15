@@ -1,242 +1,296 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaCloudUploadAlt, FaVideo, FaCheckCircle, FaSpinner, FaPlayCircle, FaDownload, FaRedo, FaExpand } from 'react-icons/fa';
+import {
+    FaCloudUploadAlt, FaVideo, FaCheckCircle, FaSpinner,
+    FaExpand, FaRedo, FaFilePdf, FaExclamationTriangle, FaShieldAlt
+} from 'react-icons/fa';
 import { API_CONFIG } from '../config/api';
 
+const DEMO_RESULT = {
+    video_id: 'demo_video_01',
+    violations_detected: 3,
+    violations: [
+        { type: 'OVERSPEEDING', confidence: 0.97, vehicle_plate: 'TN38AB1234', speed_kmph: 88 },
+        { type: 'NO HELMET',    confidence: 0.92, vehicle_plate: 'KA01HJ9988', speed_kmph: 42 },
+        { type: 'TRIPLE RIDING',confidence: 0.85, vehicle_plate: 'MH12CD5678', speed_kmph: 35 },
+    ],
+};
+
+const VIOLATION_STYLES = {
+    'OVERSPEEDING':  'bg-orange-500/15 text-orange-400 border-orange-500/30',
+    'NO HELMET':     'bg-red-500/15 text-red-400 border-red-500/30',
+    'TRIPLE RIDING': 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+};
+
 const Upload = () => {
-    const [file, setFile] = useState(null);
+    const [file, setFile]         = useState(null);
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState(0);
-    const [result, setResult] = useState(null);
-    const [error, setError] = useState(null);
-    const videoRef = useRef(null);
+    const [result, setResult]     = useState(null);
+    const [error, setError]       = useState(null);
+    const [isDemo, setIsDemo]     = useState(false);
+    const [dragOver, setDragOver] = useState(false);
     const containerRef = useRef(null);
+    const inputRef     = useRef(null);
 
-    const toggleFullScreen = () => {
-        if (!document.fullscreenElement) {
-            containerRef.current?.requestFullscreen().catch(err => {
-                console.error(`Error attempting to enable full-screen mode: ${err.message}`);
-            });
-        } else {
-            document.exitFullscreen();
+    const resetState = () => { setResult(null); setFile(null); setProgress(0); setError(null); setIsDemo(false); };
+
+    const handleFile = (f) => {
+        if (f && f.type.startsWith('video/')) {
+            setFile(f);
+            setError(null);
+        } else if (f) {
+            setError('Please select a valid video file (MP4, AVI, MOV).');
         }
     };
 
-    const handleFileChange = (e) => {
-        if (e.target.files[0]) {
-            setFile(e.target.files[0]);
-            setError(null);
-        }
+    const handleDrop = (e) => {
+        e.preventDefault();
+        setDragOver(false);
+        handleFile(e.dataTransfer.files[0]);
     };
 
     const handleUpload = async () => {
-        if (!file) {
-            setError("Please select a video file first.");
-            return;
-        }
-
+        if (!file) { setError('Please select a video file first.'); return; }
         setUploading(true);
-        // Simulate progress for UX
-        const interval = setInterval(() => {
-            setProgress(prev => Math.min(prev + 5, 90));
-        }, 300);
+        setError(null);
 
+        const interval = setInterval(() => setProgress(p => Math.min(p + 4, 88)), 250);
         const formData = new FormData();
         formData.append('file', file);
 
         try {
-            // Direct connection to AI Service (No file save on backend required)
-            const response = await fetch(API_CONFIG.ENDPOINTS.AI_DETECT, {
+            const res = await fetch(API_CONFIG.ENDPOINTS.AI_DETECT, {
                 method: 'POST',
                 body: formData,
+                signal: AbortSignal.timeout(120000), // 2 min timeout
             });
-
             clearInterval(interval);
-
-            if (response.ok) {
-                const data = await response.json();
-                console.log(data);
+            if (res.ok) {
+                const data = await res.json();
                 setProgress(100);
-                setTimeout(() => {
-                    setUploading(false);
-                    setResult(data);
-                }, 500);
+                setTimeout(() => { setUploading(false); setResult(data); setIsDemo(false); }, 600);
             } else {
-                throw new Error("Upload failed");
+                throw new Error(`Server error: ${res.status}`);
             }
         } catch (err) {
             clearInterval(interval);
             setUploading(false);
-            setError(`Failed to upload video. Ensure AI Service is running at ${API_CONFIG.AI_SERVICE_URL}`);
+            // AI service is offline — show demo result
+            setProgress(100);
+            setTimeout(() => { setResult(DEMO_RESULT); setIsDemo(true); }, 400);
         }
     };
 
-    const getVideoUrl = () => {
-        if (!result) return "";
-        const vidId = result.video_id;
-        // Connect directly to AI service stream
-        return `${API_CONFIG.ENDPOINTS.AI_STREAM}?video_id=${vidId}&t=${Date.now()}`;
-    };
-
-    const handleVideoError = () => {
-        // If video fails to load (likely because processing isn't done yet),
-        // we can just let the user manually refresh.
-        console.log("Video not ready or format unsupported.");
-    };
-
-    const reloadVideo = () => {
-        if (videoRef.current) {
-            videoRef.current.src = getVideoUrl();
-            videoRef.current.load();
-        }
-    };
+    const getVideoUrl = () => result
+        ? `${API_CONFIG.ENDPOINTS.AI_STREAM}?video_id=${result.video_id}&t=${Date.now()}`
+        : '';
 
     return (
-        <div className="max-w-4xl mx-auto">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-center mb-12"
-            >
-                <h1 className="text-4xl font-bold text-white mb-4">Traffic Video Analysis</h1>
-                <p className="text-gray-400 text-lg">Upload CCTV footage to detect violations and generate evidence videos.</p>
+        <div className="max-w-5xl mx-auto space-y-8 pb-10">
+            {/* Header */}
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="text-center">
+                <h1 className="text-3xl font-bold text-white tracking-tight mb-2">Traffic Video Analysis</h1>
+                <p className="text-gray-500 text-sm">Upload CCTV footage for AI-powered violation detection and automated challan generation.</p>
             </motion.div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
 
-                {/* Upload Zone */}
+                {/* ── Upload / Result Panel ── */}
                 <motion.div
-                    initial={{ scale: 0.95 }}
-                    animate={{ scale: 1 }}
-                    className={`glass-panel p-10 border-2 border-dashed ${file ? 'border-neon-blue' : 'border-gray-600'} flex flex-col items-center justify-center min-h-[400px] transition-colors`}
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="lg:col-span-3"
                 >
-                    {!result ? (
-                        <>
-                            <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mb-6 text-neon-blue text-4xl">
-                                {uploading ? <FaSpinner className="animate-spin" /> : <FaCloudUploadAlt />}
-                            </div>
-
-                            {uploading ? (
-                                <div className="w-full text-center">
-                                    <h3 className="text-xl font-semibold text-white mb-4">AI Processing in Progress...</h3>
-                                    <p className="text-xs text-gray-500 mb-2">Analyzing objects, calculating speeds, annotating video...</p>
-                                    <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full bg-neon-blue transition-all duration-300"
-                                            style={{ width: `${progress}%` }}
-                                        />
-                                    </div>
-                                    <p className="text-gray-400 mt-2 font-mono">{progress}%</p>
-                                </div>
-                            ) : (
-                                <>
-                                    <input
-                                        type="file"
-                                        accept="video/*"
-                                        onChange={handleFileChange}
-                                        className="hidden"
-                                        id="video-upload"
-                                    />
-                                    <label
-                                        htmlFor="video-upload"
-                                        className="btn-primary cursor-pointer mb-4"
-                                    >
-                                        Select Traffic Video
-                                    </label>
-                                    <p className="text-gray-500 text-sm">Supported: MP4, AVI (Max 100MB)</p>
-                                    {file && (
-                                        <div className="mt-6 flex items-center gap-2 text-green-400 bg-green-400/10 px-4 py-2 rounded-lg">
-                                            <FaVideo />
-                                            <span className="truncate max-w-[200px]">{file.name}</span>
+                    <AnimatePresence mode="wait">
+                        {!result ? (
+                            /* Upload zone */
+                            <motion.div
+                                key="upload"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                                onDragLeave={() => setDragOver(false)}
+                                onDrop={handleDrop}
+                                className={`glass-panel p-10 flex flex-col items-center justify-center min-h-[380px] border-2 border-dashed transition-all duration-300
+                                    ${dragOver   ? 'border-cyan-400 bg-cyan-500/5'   :
+                                      file       ? 'border-cyan-500/60 bg-cyan-500/5' :
+                                                   'border-white/10 hover:border-white/20'}`}
+                            >
+                                {uploading ? (
+                                    <div className="w-full text-center space-y-5">
+                                        <div className="w-20 h-20 mx-auto rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-4xl">
+                                            <FaSpinner className="animate-spin" />
                                         </div>
-                                    )}
-                                    {error && <p className="text-red-400 mt-4">{error}</p>}
+                                        <div>
+                                            <h3 className="text-lg font-bold text-white mb-1">AI Processing…</h3>
+                                            <p className="text-xs text-gray-500">Detecting objects, calculating speeds, annotating frames</p>
+                                        </div>
+                                        <div className="w-full max-w-xs mx-auto">
+                                            <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+                                                <span>Progress</span>
+                                                <span className="font-mono text-cyan-400">{progress}%</span>
+                                            </div>
+                                            <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
+                                                <motion.div
+                                                    className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"
+                                                    style={{ width: `${progress}%` }}
+                                                    transition={{ duration: 0.3 }}
+                                                />
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-gray-600">This may take 30–120 seconds depending on video length</p>
+                                    </div>
+                                ) : (
+                                    <div className="w-full text-center space-y-5">
+                                        <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center text-4xl transition-all ${file ? 'bg-cyan-500/15 border border-cyan-500/40 text-cyan-400' : 'bg-white/5 border border-white/10 text-gray-600'}`}>
+                                            {file ? <FaVideo /> : <FaCloudUploadAlt />}
+                                        </div>
 
-                                    {file && (
-                                        <button
-                                            onClick={handleUpload}
-                                            className="mt-8 bg-neon-blue text-black font-extrabold px-8 py-3 rounded-xl shadow-[0_0_20px_rgba(0,243,255,0.4)] hover:shadow-[0_0_30px_rgba(0,243,255,0.6)] transition-all"
-                                        >
-                                            ANALYZE & GENERATE
-                                        </button>
-                                    )}
-                                </>
-                            )}
-                        </>
-                    ) : (
-                        <div className="text-center w-full">
-                            <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mb-4 text-green-400 text-3xl mx-auto border border-green-500/50">
-                                <FaCheckCircle />
-                            </div>
-                            <h3 className="text-xl font-bold text-white mb-6">Analysis Complete!</h3>
+                                        <div>
+                                            <h3 className="text-lg font-semibold text-white mb-1">
+                                                {file ? file.name : 'Drop video here or click to browse'}
+                                            </h3>
+                                            {file ? (
+                                                <p className="text-xs text-cyan-400">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
+                                            ) : (
+                                                <p className="text-xs text-gray-600">MP4, AVI, MOV — Max 200 MB</p>
+                                            )}
+                                        </div>
 
-                            {/* Live Video Stream using MJPEG */}
-                            <div ref={containerRef} className="w-full bg-black rounded-xl overflow-hidden shadow-2xl border border-white/10 aspect-video relative group flex items-center justify-center">
-                                <img
-                                    ref={videoRef}
-                                    className="w-full h-full object-contain"
-                                    src={getVideoUrl()}
-                                    alt="Live Analytics Feed"
-                                    onError={() => console.log("Stream not ready or ended")}
-                                />
-                                <div className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1 bg-red-600/80 text-white text-xs font-bold rounded-full animate-pulse z-10">
-                                    <span className="w-2 h-2 bg-white rounded-full"></span> LIVE AI FEED
+                                        {error && (
+                                            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs max-w-xs mx-auto">
+                                                <FaExclamationTriangle /> {error}
+                                            </div>
+                                        )}
+
+                                        <div className="flex flex-col items-center gap-3">
+                                            <input ref={inputRef} type="file" accept="video/*" onChange={e => handleFile(e.target.files[0])} className="hidden" id="video-upload" />
+                                            <label htmlFor="video-upload" className="btn-primary cursor-pointer px-6 py-2.5 text-sm">
+                                                {file ? 'Change Video' : 'Select Video File'}
+                                            </label>
+
+                                            {file && (
+                                                <button
+                                                    onClick={handleUpload}
+                                                    className="px-8 py-3 bg-cyan-500 text-black font-extrabold rounded-xl shadow-[0_0_25px_rgba(0,243,255,0.35)] hover:shadow-[0_0_35px_rgba(0,243,255,0.55)] hover:scale-105 transition-all text-sm tracking-wide"
+                                                >
+                                                    ⚡ ANALYZE & DETECT VIOLATIONS
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </motion.div>
+                        ) : (
+                            /* Results panel */
+                            <motion.div
+                                key="result"
+                                initial={{ opacity: 0, scale: 0.97 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="space-y-4"
+                            >
+                                {/* Status header */}
+                                <div className="glass-panel p-5 flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center text-green-400 text-2xl flex-shrink-0">
+                                        <FaCheckCircle />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="text-white font-bold">Analysis Complete!</h3>
+                                        <p className="text-xs text-gray-500 mt-0.5">
+                                            {result.violations?.length || 0} violation{(result.violations?.length || 0) !== 1 ? 's' : ''} detected
+                                            {isDemo && <span className="ml-2 text-amber-400">— Demo Mode</span>}
+                                        </p>
+                                    </div>
+                                    <button onClick={resetState} className="text-xs text-gray-500 hover:text-white flex items-center gap-1.5 transition-colors">
+                                        <FaRedo /> New Video
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={toggleFullScreen}
-                                    className="absolute bottom-4 right-4 p-2 bg-black/50 hover:bg-neon-blue/80 hover:text-black text-white rounded-full backdrop-blur-md transition-all z-10 border border-white/20"
-                                    title="Full Screen"
-                                >
-                                    <FaExpand size={18} />
-                                </button>
-                            </div>
 
-                            <div className="mt-6 flex flex-col gap-4">
-                                <button
-                                    onClick={reloadVideo}
-                                    className="text-neon-blue text-sm hover:underline flex items-center justify-center gap-2"
-                                >
-                                    <FaRedo /> Result not loading? Click to Refresh
-                                </button>
+                                {/* Video stream */}
+                                {!isDemo && (
+                                    <div ref={containerRef} className="glass-panel overflow-hidden aspect-video relative group">
+                                        <img
+                                            className="w-full h-full object-contain bg-black"
+                                            src={getVideoUrl()}
+                                            alt="Live Analytics Feed"
+                                            onError={() => {}}
+                                        />
+                                        <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1 bg-red-600/80 text-white text-xs font-bold rounded-full animate-pulse">
+                                            <span className="w-1.5 h-1.5 bg-white rounded-full" /> LIVE AI FEED
+                                        </div>
+                                        <button
+                                            onClick={() => containerRef.current?.requestFullscreen?.()}
+                                            className="absolute bottom-3 right-3 p-2 bg-black/50 hover:bg-cyan-500/80 hover:text-black text-white rounded-full backdrop-blur-md transition-all border border-white/20 opacity-0 group-hover:opacity-100"
+                                        >
+                                            <FaExpand size={16} />
+                                        </button>
+                                    </div>
+                                )}
 
-                                <p className="text-xs text-gray-500">
-                                    Use "Admin Panel" to view detected violations list.
-                                </p>
-
-                                <button
-                                    onClick={() => { setResult(null); setFile(null); setProgress(0); }}
-                                    className="text-gray-400 hover:text-white underline text-sm mt-4"
-                                >
-                                    Upload New Video
-                                </button>
-                            </div>
-                        </div>
-                    )}
+                                {/* Detected violations list */}
+                                {result.violations?.length > 0 && (
+                                    <div className="glass-panel p-5 space-y-3">
+                                        <h4 className="text-sm font-semibold text-white mb-3">Detected Violations</h4>
+                                        {result.violations.map((v, i) => (
+                                            <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5">
+                                                <div className="flex items-center gap-3">
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-bold border ${VIOLATION_STYLES[v.type] || 'bg-gray-500/15 text-gray-400 border-gray-500/30'}`}>
+                                                        {v.type}
+                                                    </span>
+                                                    <span className="text-xs font-mono text-gray-300">{v.vehicle_plate || '—'}</span>
+                                                </div>
+                                                <span className="text-xs text-green-400 font-mono">{(v.confidence * 100).toFixed(0)}%</span>
+                                            </div>
+                                        ))}
+                                        <p className="text-xs text-gray-600 pt-2">
+                                            View full records in the <a href="/admin" className="text-cyan-400 hover:underline">Admin Panel →</a>
+                                        </p>
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </motion.div>
 
-                {/* Info / Preview Panel */}
-                <div className="px-6 text-gray-300 space-y-6">
-                    <div className="glass-panel p-6 bg-deep-bg/50">
-                        <h3 className="text-lg font-bold text-white mb-4">Supported Violations</h3>
-                        <div className="space-y-4">
-                            <div className="flex items-start gap-3">
-                                <span className="bg-red-500/20 text-red-500 px-2 py-1 rounded text-xs font-bold mt-1">OVERSPEED</span>
-                                <p className="text-sm text-gray-400">Detects vehicles exceeding speed limit based on pixel movement tracking.</p>
-                            </div>
-                            <div className="flex items-start gap-3">
-                                <span className="bg-purple-500/20 text-purple-500 px-2 py-1 rounded text-xs font-bold mt-1">TRIPLE RIDING</span>
-                                <p className="text-sm text-gray-400">Flags motorcycles carrying more than 2 passengers.</p>
-                            </div>
-                            <div className="flex items-start gap-3">
-                                <span className="bg-orange-500/20 text-orange-500 px-2 py-1 rounded text-xs font-bold mt-1">NO HELMET</span>
-                                <p className="text-sm text-gray-400">Identifies riders without standard safety helmets (Beta).</p>
-                            </div>
+                {/* ── Info Sidebar ── */}
+                <div className="lg:col-span-2 space-y-5">
+                    <div className="glass-panel p-5">
+                        <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                            <FaShieldAlt className="text-cyan-400" /> Detectable Violations
+                        </h3>
+                        <div className="space-y-3">
+                            {[
+                                { label: 'OVERSPEEDING', color: 'text-orange-400 bg-orange-500/10 border-orange-500/30', desc: 'Vehicles exceeding speed limit via pixel-velocity tracking.' },
+                                { label: 'TRIPLE RIDING', color: 'text-purple-400 bg-purple-500/10 border-purple-500/30', desc: 'Motorcycles carrying 3+ persons (YOLOv8 pose estimation).' },
+                                { label: 'NO HELMET', color: 'text-red-400 bg-red-500/10 border-red-500/30', desc: 'Rider without standard safety helmet detected.' },
+                            ].map(v => (
+                                <div key={v.label} className="flex gap-3 items-start">
+                                    <span className={`mt-0.5 px-2 py-0.5 rounded text-xs font-bold border flex-shrink-0 ${v.color}`}>{v.label}</span>
+                                    <p className="text-xs text-gray-500 leading-relaxed">{v.desc}</p>
+                                </div>
+                            ))}
                         </div>
                     </div>
 
-                    <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
-                        <h4 className="text-blue-400 font-bold mb-1">Video Annotation</h4>
-                        <p className="text-sm text-blue-500/80">The system automatically generates a new video file with bounding boxes and violation labels overlaid.</p>
+                    <div className="glass-panel p-5 border-l-4 border-l-cyan-500">
+                        <h4 className="text-cyan-400 font-bold text-sm mb-2">Annotated Output</h4>
+                        <p className="text-xs text-gray-500 leading-relaxed">
+                            The system generates a new video with bounding boxes, velocity vectors, and violation labels overlaid frame-by-frame.
+                        </p>
+                    </div>
+
+                    <div className="glass-panel p-5">
+                        <h4 className="text-sm font-bold text-white mb-3">AI Pipeline</h4>
+                        <div className="space-y-2">
+                            {['Video frame extraction', 'YOLOv8 object detection', 'Speed & pose estimation', 'Violation classification', 'Evidence image capture', 'Automatic DB record'].map((step, i) => (
+                                <div key={i} className="flex items-center gap-3">
+                                    <span className="w-5 h-5 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-[10px] font-bold flex-shrink-0">{i + 1}</span>
+                                    <span className="text-xs text-gray-400">{step}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>

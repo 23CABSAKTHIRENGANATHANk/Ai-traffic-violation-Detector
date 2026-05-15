@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
     FaCog, FaSave, FaCheckCircle, FaExclamationTriangle,
-    FaToggleOn, FaToggleOff, FaSlider, FaSpinner, FaArrowLeft
+    FaToggleOn, FaToggleOff, FaAdjust, FaSpinner, FaArrowLeft
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { API_CONFIG } from '../config/api';

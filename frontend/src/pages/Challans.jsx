@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaFilePdf, FaCar, FaMotorcycle, FaTruck, FaBus, FaSync, FaRupeeSign, FaCheckCircle } from 'react-icons/fa';
+import { FaFilePdf, FaCar, FaMotorcycle, FaTruck, FaBus, FaSync, FaRupeeSign, FaCheckCircle, FaTimes, FaEdit, FaDownload } from 'react-icons/fa';
 import { API_CONFIG } from '../config/api';
 
 const MOCK_APPROVED = [
@@ -36,11 +36,226 @@ const VehicleIcon = ({ type }) => {
     }
 };
 
+// Challan Details Modal Component
+const ChallanDetailsModal = ({ challan, FINES, isOpen, onClose, onDownload }) => {
+    const [editedChallan, setEditedChallan] = useState(challan);
+    const [errors, setErrors] = useState({});
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    useEffect(() => {
+        setEditedChallan(challan);
+        setErrors({});
+    }, [challan, isOpen]);
+
+    const validateForm = () => {
+        const newErrors = {};
+        if (!editedChallan.vehicle_plate?.trim()) newErrors.vehicle_plate = 'Vehicle number required';
+        if (!editedChallan.violation_type) newErrors.violation_type = 'Violation type required';
+        if (!editedChallan.vehicle_type) newErrors.vehicle_type = 'Vehicle type required';
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const handleGeneratePDF = async () => {
+        if (!validateForm()) return;
+        setIsGenerating(true);
+        try {
+            await onDownload(editedChallan);
+        } finally {
+            setIsGenerating(false);
+            onClose();
+        }
+    };
+
+    if (!isOpen) return null;
+
+    const fine = FINES[editedChallan.violation_type] || 500;
+
+    return (
+        <AnimatePresence>
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+                onClick={onClose}
+            >
+                <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/10"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {/* Header */}
+                    <div className="sticky top-0 bg-gradient-to-r from-red-600 to-red-700 px-6 py-4 flex items-center justify-between border-b border-white/10">
+                        <h2 className="text-xl font-bold text-white">Challan Details & Preview</h2>
+                        <button onClick={onClose} className="text-white hover:bg-white/20 p-2 rounded-lg transition">
+                            <FaTimes />
+                        </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-6 space-y-6">
+                        {/* Vehicle Information */}
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <VehicleIcon type={editedChallan.vehicle_type} />
+                                Vehicle Information
+                            </h3>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-300 mb-2">Vehicle Number</label>
+                                    <input
+                                        type="text"
+                                        value={editedChallan.vehicle_plate || ''}
+                                        onChange={(e) => setEditedChallan({ ...editedChallan, vehicle_plate: e.target.value.toUpperCase() })}
+                                        className={`w-full px-4 py-2 rounded-lg bg-white/5 border ${
+                                            errors.vehicle_plate ? 'border-red-500' : 'border-white/20'
+                                        } text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 focus:bg-white/10 transition`}
+                                        placeholder="e.g., TN01AB1234"
+                                    />
+                                    {errors.vehicle_plate && <p className="text-red-400 text-xs mt-1">{errors.vehicle_plate}</p>}
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-300 mb-2">Vehicle Type</label>
+                                    <select
+                                        value={editedChallan.vehicle_type || ''}
+                                        onChange={(e) => setEditedChallan({ ...editedChallan, vehicle_type: e.target.value })}
+                                        className={`w-full px-4 py-2 rounded-lg bg-white/5 border ${
+                                            errors.vehicle_type ? 'border-red-500' : 'border-white/20'
+                                        } text-white focus:outline-none focus:border-cyan-500 focus:bg-white/10 transition`}
+                                    >
+                                        <option value="">Select type...</option>
+                                        <option value="CAR">Car</option>
+                                        <option value="MOTORCYCLE">Motorcycle</option>
+                                        <option value="TRUCK">Truck</option>
+                                        <option value="BUS">Bus</option>
+                                        <option value="AUTORICKSHAW">Auto Rickshaw</option>
+                                    </select>
+                                    {errors.vehicle_type && <p className="text-red-400 text-xs mt-1">{errors.vehicle_type}</p>}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Violation Details */}
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-bold text-white">Violation Details</h3>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-300 mb-2">Violation Type</label>
+                                    <select
+                                        value={editedChallan.violation_type || ''}
+                                        onChange={(e) => setEditedChallan({ ...editedChallan, violation_type: e.target.value })}
+                                        className={`w-full px-4 py-2 rounded-lg bg-white/5 border ${
+                                            errors.violation_type ? 'border-red-500' : 'border-white/20'
+                                        } text-white focus:outline-none focus:border-cyan-500 focus:bg-white/10 transition`}
+                                    >
+                                        <option value="">Select violation...</option>
+                                        <option value="OVERSPEEDING">Over-speeding</option>
+                                        <option value="NO HELMET">No Helmet</option>
+                                        <option value="TRIPLE RIDING">Triple Riding</option>
+                                        <option value="RED SIGNAL">Red Signal Violation</option>
+                                        <option value="PARKING VIOLATION">Parking Violation</option>
+                                    </select>
+                                    {errors.violation_type && <p className="text-red-400 text-xs mt-1">{errors.violation_type}</p>}
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-300 mb-2">Speed (km/h)</label>
+                                    <input
+                                        type="number"
+                                        value={editedChallan.speed_kmph || ''}
+                                        onChange={(e) => setEditedChallan({ ...editedChallan, speed_kmph: Number(e.target.value) })}
+                                        className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/20 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 focus:bg-white/10 transition"
+                                        placeholder="0"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-300 mb-2">AI Confidence</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="100"
+                                            value={(editedChallan.confidence_score || 0.9) * 100}
+                                            onChange={(e) => setEditedChallan({ ...editedChallan, confidence_score: Number(e.target.value) / 100 })}
+                                            className="flex-1 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                                        />
+                                        <span className="text-cyan-400 font-bold min-w-fit">{((editedChallan.confidence_score || 0.9) * 100).toFixed(0)}%</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-300 mb-2">Issue Date</label>
+                                    <input
+                                        type="datetime-local"
+                                        value={new Date(editedChallan.created_at || new Date()).toISOString().slice(0, 16)}
+                                        onChange={(e) => setEditedChallan({ ...editedChallan, created_at: new Date(e.target.value).toISOString() })}
+                                        className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/20 text-white focus:outline-none focus:border-cyan-500 focus:bg-white/10 transition"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Fine Amount Preview */}
+                        <div className="p-4 bg-gradient-to-r from-red-500/20 to-orange-500/20 rounded-xl border border-red-500/30">
+                            <div className="flex items-center justify-between">
+                                <span className="text-gray-300 font-semibold">Fine Amount:</span>
+                                <span className="text-3xl font-black text-red-400">₹{fine.toLocaleString('en-IN')}</span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">Due date: {new Date(new Date(editedChallan.created_at || new Date()).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN')}</p>
+                        </div>
+
+                        {/* Additional Info */}
+                        <div className="bg-white/5 p-4 rounded-lg border border-white/10">
+                            <h4 className="text-sm font-bold text-gray-300 mb-2">Additional Information</h4>
+                            <div className="space-y-2 text-xs text-gray-400">
+                                <p><span className="font-semibold">Challan ID:</span> CH-{editedChallan.id}-{Date.now().toString().slice(-6)}</p>
+                                <p><span className="font-semibold">Video ID:</span> {editedChallan.video_id || 'Not specified'}</p>
+                                <p><span className="font-semibold">Generated at:</span> {new Date().toLocaleString('en-IN')}</p>
+                            </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-3 pt-4">
+                            <button
+                                onClick={onClose}
+                                className="flex-1 px-4 py-3 rounded-lg bg-white/5 border border-white/20 text-white hover:bg-white/10 transition font-semibold"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleGeneratePDF}
+                                disabled={isGenerating}
+                                className="flex-1 px-4 py-3 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-700 disabled:opacity-50 transition font-semibold flex items-center justify-center gap-2"
+                            >
+                                {isGenerating ? (
+                                    <><FaSync className="animate-spin" /> Generating...</>
+                                ) : (
+                                    <><FaDownload /> Generate & Download PDF</>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </motion.div>
+            </motion.div>
+        </AnimatePresence>
+    );
+};
+
 const Challans = () => {
     const [challans, setChallans]   = useState([]);
     const [loading, setLoading]     = useState(true);
     const [isDemo, setIsDemo]       = useState(false);
     const [downloading, setDownloading] = useState(null);
+    const [modalOpen, setModalOpen] = useState(false);
+    const [selectedChallan, setSelectedChallan] = useState(null);
+    const [notification, setNotification] = useState(null);
 
     const fetchChallans = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
@@ -49,7 +264,6 @@ const Challans = () => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             
-            // Merge backend data with localStorage
             const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
             const merged = [...localViolations];
             (Array.isArray(data) ? data : []).forEach(v => {
@@ -78,47 +292,70 @@ const Challans = () => {
     }, [fetchChallans]);
 
     const downloadPDF = async (challan) => {
-        if (isDemo) {
-            // Client-side PDF generation for Demo Mode
-            setDownloading(challan.id);
-            await new Promise(r => setTimeout(r, 600)); // Simulate slight delay
-            
-            import('../utils/pdfGenerator').then(module => {
-                module.generateClientSidePDF(challan, FINES);
-                setDownloading(null);
-            }).catch(err => {
-                console.error("Error loading PDF generator", err);
-                setDownloading(null);
-                alert("Failed to generate PDF in Demo Mode.");
-            });
-            return;
-        }
         setDownloading(challan.id);
         try {
-            const res = await fetch(`${API_CONFIG.ENDPOINTS.VIOLATIONS}/${challan.id}/challan`, { method: 'POST' });
-            if (res.ok) {
-                const blob = await res.blob();
-                const url  = window.URL.createObjectURL(blob);
-                const a    = document.createElement('a');
-                a.href     = url;
-                a.download = `Challan_${challan.id}_${challan.vehicle_plate || 'UNKNOWN'}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
+            if (isDemo) {
+                await new Promise(r => setTimeout(r, 600));
+                const module = await import('../utils/pdfGenerator');
+                await module.generateClientSidePDF(challan, FINES);
+                showNotification('PDF generated successfully!', 'success');
             } else {
-                alert('Failed to download PDF. Ensure backend is running.');
+                const res = await fetch(`${API_CONFIG.ENDPOINTS.VIOLATIONS}/${challan.id}/challan`, { method: 'POST' });
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const url  = window.URL.createObjectURL(blob);
+                    const a    = document.createElement('a');
+                    a.href     = url;
+                    a.download = `Challan_${challan.id}_${challan.vehicle_plate || 'UNKNOWN'}_${Date.now()}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(url);
+                    showNotification('Challan downloaded successfully!', 'success');
+                } else {
+                    showNotification('Failed to download PDF', 'error');
+                }
             }
-        } catch {
-            alert('Error downloading challan.');
+        } catch (error) {
+            console.error('PDF download error:', error);
+            showNotification('Error generating PDF', 'error');
         } finally {
             setDownloading(null);
         }
+    };
+
+    const showNotification = (message, type = 'info') => {
+        setNotification({ message, type });
+        setTimeout(() => setNotification(null), 3000);
     };
 
     const totalRevenue = challans.reduce((acc, c) => acc + (FINES[c.violation_type] || 500), 0);
 
     return (
         <div className="space-y-6 pb-10">
+            {/* Notification */}
+            <AnimatePresence>
+                {notification && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className={`fixed top-4 left-4 right-4 z-40 px-4 py-3 rounded-lg flex items-center gap-3 ${
+                            notification.type === 'success' ? 'bg-green-500/20 border border-green-500/30 text-green-300' :
+                            notification.type === 'error' ? 'bg-red-500/20 border border-red-500/30 text-red-300' :
+                            'bg-blue-500/20 border border-blue-500/30 text-blue-300'
+                        }`}
+                    >
+                        <div className={`w-2 h-2 rounded-full ${
+                            notification.type === 'success' ? 'bg-green-400' :
+                            notification.type === 'error' ? 'bg-red-400' :
+                            'bg-blue-400'
+                        }`} />
+                        {notification.message}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -134,7 +371,7 @@ const Challans = () => {
                     )}
                     <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-bold text-sm">
                         <FaRupeeSign className="text-xs" />
-                        Total: ₹{totalRevenue.toLocaleString()}
+                        Total: ₹{totalRevenue.toLocaleString('en-IN')}
                     </div>
                     <button
                         onClick={() => fetchChallans()}
@@ -224,22 +461,33 @@ const Challans = () => {
                                         </div>
                                         <div className="pt-3 border-t border-white/5 flex items-center justify-between">
                                             <span className="text-xs text-gray-500">Fine Amount</span>
-                                            <span className="text-xl font-black text-white">₹{fine.toLocaleString()}</span>
+                                            <span className="text-xl font-black text-white">₹{fine.toLocaleString('en-IN')}</span>
                                         </div>
                                     </div>
 
-                                    {/* Action */}
-                                    <button
-                                        onClick={() => downloadPDF(c)}
-                                        disabled={downloading === c.id}
-                                        className="relative w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/20 hover:text-cyan-200 transition-all text-sm font-bold disabled:opacity-60"
-                                    >
-                                        {downloading === c.id ? (
-                                            <><FaSync className="animate-spin" /> Generating PDF…</>
-                                        ) : (
-                                            <><FaFilePdf /> Download PDF Challan</>
-                                        )}
-                                    </button>
+                                    {/* Actions */}
+                                    <div className="space-y-2 relative">
+                                        <button
+                                            onClick={() => {
+                                                setSelectedChallan(c);
+                                                setModalOpen(true);
+                                            }}
+                                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-500/10 text-blue-300 border border-blue-500/30 hover:bg-blue-500/20 hover:text-blue-200 transition-all text-sm font-bold"
+                                        >
+                                            <FaEdit /> Edit & Preview
+                                        </button>
+                                        <button
+                                            onClick={() => downloadPDF(c)}
+                                            disabled={downloading === c.id}
+                                            className="relative w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/20 hover:text-cyan-200 transition-all text-sm font-bold disabled:opacity-60"
+                                        >
+                                            {downloading === c.id ? (
+                                                <><FaSync className="animate-spin" /> Generating PDF…</>
+                                            ) : (
+                                                <><FaFilePdf /> Download PDF</>
+                                            )}
+                                        </button>
+                                    </div>
                                 </motion.div>
                             );
                         })}
@@ -262,12 +510,23 @@ const Challans = () => {
                     </div>
                     <div className="text-sm text-gray-500">
                         Total recoverable revenue:{' '}
-                        <span className="text-cyan-400 font-bold">₹{totalRevenue.toLocaleString()}</span>
+                        <span className="text-cyan-400 font-bold">₹{totalRevenue.toLocaleString('en-IN')}</span>
                     </div>
                     {isDemo && (
                         <p className="text-xs text-amber-500/70 italic">⚠ Demo data — connect backend for live challans</p>
                     )}
                 </motion.div>
+            )}
+
+            {/* Modal */}
+            {selectedChallan && (
+                <ChallanDetailsModal
+                    challan={selectedChallan}
+                    FINES={FINES}
+                    isOpen={modalOpen}
+                    onClose={() => setModalOpen(false)}
+                    onDownload={downloadPDF}
+                />
             )}
         </div>
     );

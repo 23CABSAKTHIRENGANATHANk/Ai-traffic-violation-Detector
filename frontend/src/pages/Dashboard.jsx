@@ -48,7 +48,12 @@ const Dashboard = () => {
             computeStats(merged.sort((a, b) => new Date(b.created_at || b.timestamp) - new Date(a.created_at || a.timestamp)));
             setIsDemo(false);
         } catch {
-            computeStats(MOCK_VIOLATIONS);
+            const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
+            const merged = [...localViolations];
+            MOCK_VIOLATIONS.forEach(v => {
+                if (!merged.find(m => m.id === v.id)) merged.push(v);
+            });
+            computeStats(merged.sort((a, b) => new Date(b.created_at || b.timestamp) - new Date(a.created_at || a.timestamp)));
             setIsDemo(true);
         } finally {
             setLoading(false);

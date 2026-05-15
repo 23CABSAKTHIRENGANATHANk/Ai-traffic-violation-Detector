@@ -1,9 +1,10 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { FaChartPie, FaVideo, FaFileInvoice, FaUserShield, FaSignOutAlt } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 
 const Sidebar = () => {
+    const navigate = useNavigate();
     const menuItems = [
         { path: '/dashboard', name: 'Dashboard', icon: <FaChartPie /> },
         { path: '/live', name: 'Violation Detection', icon: <FaVideo /> },
@@ -43,7 +44,13 @@ const Sidebar = () => {
                 ))}
             </nav>
 
-            <button className="flex items-center gap-4 px-4 py-3 text-red-400 hover:bg-neon-red/10 hover:text-neon-red rounded-xl transition-all duration-300 mt-auto border border-transparent hover:border-neon-red/20">
+            <button 
+                onClick={() => {
+                    localStorage.removeItem('traffic_violations');
+                    navigate('/');
+                }}
+                className="flex items-center gap-4 px-4 py-3 text-red-400 hover:bg-neon-red/10 hover:text-neon-red rounded-xl transition-all duration-300 mt-auto border border-transparent hover:border-neon-red/20"
+            >
                 <FaSignOutAlt />
                 <span className="font-medium">Logout</span>
             </button>

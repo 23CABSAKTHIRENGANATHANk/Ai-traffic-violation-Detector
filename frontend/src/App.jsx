@@ -6,6 +6,8 @@ import Upload from './pages/Upload';
 import Admin from './pages/Admin';
 import Challans from './pages/Challans';
 import Landing from './pages/Landing';
+import Analytics from './pages/Analytics';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -17,7 +19,9 @@ function App() {
         {/* App Pages (With Layout) */}
         <Route path="/live" element={<Layout><Upload /></Layout>} />
         <Route path="/admin" element={<Layout><Admin /></Layout>} />
+        <Route path="/analytics" element={<Layout><Analytics /></Layout>} />
         <Route path="/challans" element={<Layout><Challans /></Layout>} />
+        <Route path="/settings" element={<Layout><Settings /></Layout>} />
         <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
       </Routes>
     </BrowserRouter>

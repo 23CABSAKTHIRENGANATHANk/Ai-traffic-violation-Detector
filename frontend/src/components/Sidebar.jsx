@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { FaChartPie, FaVideo, FaFileInvoice, FaUserShield, FaSignOutAlt } from 'react-icons/fa';
+import { FaChartPie, FaVideo, FaFileInvoice, FaUserShield, FaSignOutAlt, FaChartBar, FaCog } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 
 const Sidebar = () => {
@@ -8,8 +8,10 @@ const Sidebar = () => {
     const menuItems = [
         { path: '/dashboard', name: 'Dashboard', icon: <FaChartPie /> },
         { path: '/live', name: 'Violation Detection', icon: <FaVideo /> },
+        { path: '/analytics', name: 'Analytics', icon: <FaChartBar /> },
         { path: '/challans', name: 'E-Challans', icon: <FaFileInvoice /> },
         { path: '/admin', name: 'Admin Panel', icon: <FaUserShield /> },
+        { path: '/settings', name: 'Settings', icon: <FaCog /> },
     ];
 
     return (

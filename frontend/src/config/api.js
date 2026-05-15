@@ -7,11 +7,28 @@ export const API_CONFIG = {
     BASE_URL: API_BASE_URL,
     AI_SERVICE_URL: AI_SERVICE_URL,
     ENDPOINTS: {
+        // Violation endpoints
         VIOLATIONS: `${API_BASE_URL}/violations`,
+        VIOLATIONS_ALL: `${API_BASE_URL}/violations`,
         UPLOAD: `${API_BASE_URL}/upload`,
         RECORD_VIOLATION: `${API_BASE_URL}/violations/record`,
+        
+        // AI Service endpoints
         AI_DETECT: `${AI_SERVICE_URL}/detect`,
         AI_STREAM: `${AI_SERVICE_URL}/video_feed`,
+        AI_VIOLATIONS: `${AI_SERVICE_URL}/violations`,
+        
+        // Analytics endpoints
+        ANALYTICS: `${API_BASE_URL}/analytics`,
+        
+        // Admin endpoints
+        ADMIN_VIOLATIONS: `${API_BASE_URL}/admin/violations`,
+        
+        // Settings endpoints
+        SETTINGS: `${API_BASE_URL}/config/settings`,
+        
+        // Challan endpoints
+        GENERATE_CHALLAN: (id) => `${API_BASE_URL}/violations/${id}/challan`,
     }
 };
 

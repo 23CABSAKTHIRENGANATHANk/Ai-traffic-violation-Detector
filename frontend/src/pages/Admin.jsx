@@ -1,9 +1,12 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaCheck, FaFilePdf, FaCar, FaMotorcycle, FaTruck, FaBus, FaSync, FaExclamationTriangle, FaShieldAlt, FaFilter, FaSearch, FaTimes, FaDownload, FaFileExcel, FaChartBar } from 'react-icons/fa';
+import { 
+    FaEdit, FaTrash, FaCheck, FaTimes, FaFilter, FaSearch, FaSpinner,
+    FaChevronLeft, FaChevronRight, FaFilePdf, FaShieldAlt, FaUserCheck,
+    FaDownload, FaFileExcel, FaChartBar, FaCar, FaMotorcycle, FaBus, FaTruck
+} from 'react-icons/fa';
 import { API_CONFIG } from '../config/api';
 
-// ── Mock data used when the backend is unreachable ───────────────────────────
 const MOCK_VIOLATIONS = [
     {
         id: 1, video_id: 'cam_01_20240515', violation_type: 'OVERSPEEDING',

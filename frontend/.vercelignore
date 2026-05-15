@@ -1,0 +1,16 @@
+# Frontend Configuration
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.local
+
+# Files to ignore during Vercel deployment
+.git/
+.gitignore
+public/
+src/
+Dockerfile
+docker*
+.DS_Store

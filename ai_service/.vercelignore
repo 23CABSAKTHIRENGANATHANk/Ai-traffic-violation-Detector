@@ -1,0 +1,21 @@
+# AI Service Configuration
+__pycache__/
+venv/
+env/
+*.pyc
+*.pyo
+.env
+.env.local
+.DS_Store
+
+# Ignore large files
+uploads/
+processed/
+*.mp4
+*.avi
+*.mov
+yolov8n.pt
+
+# Docker
+Dockerfile
+docker*

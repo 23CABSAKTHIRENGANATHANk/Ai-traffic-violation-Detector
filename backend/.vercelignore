@@ -1,0 +1,17 @@
+# Backend Configuration
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.local
+
+# Files to ignore during Vercel deployment
+.git/
+.gitignore
+src/
+docker*
+docker-compose.yml
+scripts/
+database/
+nodemon.json

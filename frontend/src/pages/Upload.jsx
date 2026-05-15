@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaCloudUploadAlt, FaVideo, FaCheckCircle, FaSpinner, FaPlayCircle, FaDownload, FaRedo, FaExpand } from 'react-icons/fa';
+import { API_CONFIG } from '../config/api';
 
 const Upload = () => {
     const [file, setFile] = useState(null);
@@ -45,7 +46,7 @@ const Upload = () => {
 
         try {
             // Direct connection to AI Service (No file save on backend required)
-            const response = await fetch('http://localhost:8000/detect', {
+            const response = await fetch(API_CONFIG.ENDPOINTS.AI_DETECT, {
                 method: 'POST',
                 body: formData,
             });
@@ -66,7 +67,7 @@ const Upload = () => {
         } catch (err) {
             clearInterval(interval);
             setUploading(false);
-            setError("Failed to upload video. Ensure AI Service (Port 8000) is running.");
+            setError(`Failed to upload video. Ensure AI Service is running at ${API_CONFIG.AI_SERVICE_URL}`);
         }
     };
 
@@ -74,7 +75,7 @@ const Upload = () => {
         if (!result) return "";
         const vidId = result.video_id;
         // Connect directly to AI service stream
-        return `http://localhost:8000/video_feed?video_id=${vidId}&t=${Date.now()}`;
+        return `${API_CONFIG.ENDPOINTS.AI_STREAM}?video_id=${vidId}&t=${Date.now()}`;
     };
 
     const handleVideoError = () => {

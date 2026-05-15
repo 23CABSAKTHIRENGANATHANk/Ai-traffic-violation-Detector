@@ -13,6 +13,7 @@ import {
     Filler
 } from 'chart.js';
 import { FaExclamationTriangle, FaRupeeSign, FaClock } from 'react-icons/fa';
+import { API_CONFIG } from '../config/api';
 
 ChartJS.register(
     CategoryScale,
@@ -35,7 +36,7 @@ const Dashboard = () => {
 
     const fetchStats = async () => {
         try {
-            const res = await fetch('http://localhost:3000/api/violations');
+            const res = await fetch(API_CONFIG.ENDPOINTS.VIOLATIONS);
             const data = await res.json();
 
             const total = data.length;

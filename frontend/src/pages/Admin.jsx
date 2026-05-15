@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { FaCheck, FaTimes, FaFilePdf, FaCar, FaMotorcycle, FaTruck, FaBus } from 'react-icons/fa';
+import { API_CONFIG } from '../config/api';
 
 const getVehicleIcon = (type) => {
     switch (type) {
@@ -18,7 +19,7 @@ const Admin = () => {
 
     const fetchViolations = async () => {
         try {
-            const res = await fetch('http://localhost:3000/api/violations');
+            const res = await fetch(API_CONFIG.ENDPOINTS.VIOLATIONS);
             const data = await res.json();
             setViolations(data);
             setLoading(false);
@@ -36,7 +37,7 @@ const Admin = () => {
 
     const generateChallan = async (id) => {
         try {
-            const res = await fetch(`http://localhost:3000/api/violations/${id}/challan`, { method: 'POST' });
+            const res = await fetch(`${API_CONFIG.ENDPOINTS.VIOLATIONS}/${id}/challan`, { method: 'POST' });
             if (res.ok) {
                 // Trigger Download
                 const blob = await res.blob();
@@ -128,13 +129,13 @@ const Admin = () => {
                                 <td className="p-4">
                                     {v.evidence_image_path ? (
                                         <a
-                                            href={`http://localhost:3000/processed/${v.evidence_image_path}`}
+                                            href={`${API_CONFIG.BASE_URL}/../processed/${v.evidence_image_path}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="block w-16 h-10 rounded overflow-hidden border border-gray-600 hover:scale-150 transition-transform origin-left"
                                         >
                                             <img
-                                                src={`http://localhost:3000/processed/${v.evidence_image_path}`}
+                                                src={`${API_CONFIG.BASE_URL}/../processed/${v.evidence_image_path}`}
                                                 alt="Evidence"
                                                 className="w-full h-full object-cover"
                                             />

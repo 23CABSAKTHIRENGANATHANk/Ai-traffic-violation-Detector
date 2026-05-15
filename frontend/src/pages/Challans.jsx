@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { FaFilePdf, FaCar, FaMotorcycle, FaTruck, FaBus } from 'react-icons/fa';
+import { API_CONFIG } from '../config/api';
 
 const getVehicleIcon = (type) => {
     switch (type) {
@@ -20,7 +21,7 @@ const Challans = () => {
     // In a real app we'd have GET /api/challans
     const fetchChallans = async () => {
         try {
-            const res = await fetch('http://localhost:3000/api/violations');
+            const res = await fetch(API_CONFIG.ENDPOINTS.VIOLATIONS);
             const data = await res.json();
             const approved = data.filter(v => v.status === 'APPROVED');
             setChallans(approved);
@@ -37,7 +38,7 @@ const Challans = () => {
 
     const downloadPDF = async (id, plate) => {
         try {
-            const res = await fetch(`http://localhost:3000/api/violations/${id}/challan`, { method: 'POST' });
+            const res = await fetch(`${API_CONFIG.ENDPOINTS.VIOLATIONS}/${id}/challan`, { method: 'POST' });
             if (res.ok) {
                 // Trigger Download
                 const blob = await res.blob();

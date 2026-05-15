@@ -66,11 +66,18 @@ const Challans = () => {
 
     const downloadPDF = async (challan) => {
         if (isDemo) {
-            // Demo: just show a brief loading then nothing
+            // Client-side PDF generation for Demo Mode
             setDownloading(challan.id);
-            await new Promise(r => setTimeout(r, 1000));
-            setDownloading(null);
-            alert(`Demo Mode: PDF download not available without live backend.\nChallan for ${challan.vehicle_plate} — Fine: ₹${(FINES[challan.violation_type] || 500).toLocaleString()}`);
+            await new Promise(r => setTimeout(r, 600)); // Simulate slight delay
+            
+            import('../utils/pdfGenerator').then(module => {
+                module.generateClientSidePDF(challan, FINES);
+                setDownloading(null);
+            }).catch(err => {
+                console.error("Error loading PDF generator", err);
+                setDownloading(null);
+                alert("Failed to generate PDF in Demo Mode.");
+            });
             return;
         }
         setDownloading(challan.id);

@@ -116,12 +116,20 @@ const Admin = () => {
 
     const generateChallan = async (violation) => {
         if (isDemo) {
-            // Demo mode — simulate locally
+            // Demo mode — simulate locally and generate PDF
             setActionLoading(violation.id);
-            await new Promise(r => setTimeout(r, 1200));
+            await new Promise(r => setTimeout(r, 600));
             setViolations(prev => prev.map(v => v.id === violation.id ? { ...v, status: 'APPROVED' } : v));
-            setActionLoading(null);
-            showNotification(`Challan approved for ${violation.vehicle_plate || 'vehicle'}!`, 'success');
+            
+            import('../utils/pdfGenerator').then(module => {
+                module.generateClientSidePDF(violation, FINES);
+                setActionLoading(null);
+                showNotification(`Challan PDF generated for ${violation.vehicle_plate || 'vehicle'}!`, 'success');
+            }).catch(err => {
+                console.error("Error loading PDF generator", err);
+                setActionLoading(null);
+                showNotification("Failed to generate PDF.", 'error');
+            });
             return;
         }
         setActionLoading(violation.id);

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaCheck, FaFilePdf, FaCar, FaMotorcycle, FaTruck, FaBus, FaSync, FaExclamationTriangle, FaShieldAlt, FaFilter, FaSearch, FaTimes, FaDownload, FaFileExcel } from 'react-icons/fa';
+import { FaCheck, FaFilePdf, FaCar, FaMotorcycle, FaTruck, FaBus, FaSync, FaExclamationTriangle, FaShieldAlt, FaFilter, FaSearch, FaTimes, FaDownload, FaFileExcel, FaChartBar } from 'react-icons/fa';
 import { API_CONFIG } from '../config/api';
 
 // ── Mock data used when the backend is unreachable ───────────────────────────
@@ -355,10 +355,10 @@ const Admin = () => {
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 {[
                     { label: 'Total Violations', value: violations.length, color: 'text-white', icon: FaShieldAlt },
-                    { label: 'Pending Review',   value: pending,           color: 'text-yellow-400', icon: FaBarChart },
+                    { label: 'Pending Review',   value: pending,           color: 'text-yellow-400', icon: FaChartBar },
                     { label: 'Approved',         value: approved,          color: 'text-green-400', icon: FaCheck },
                     { label: 'Potential Revenue', value: `₹${(totalFine / 100000).toFixed(1)}L`, color: 'text-cyan-400', icon: FaDownload },
-                    { label: 'Success Rate', value: `${violations.length > 0 ? Math.round((approved / violations.length) * 100) : 0}%`, color: 'text-purple-400', icon: FaBarChart },
+                    { label: 'Success Rate', value: `${violations.length > 0 ? Math.round((approved / violations.length) * 100) : 0}%`, color: 'text-purple-400', icon: FaChartBar },
                 ].map((stat, i) => (
                     <motion.div
                         key={stat.label}

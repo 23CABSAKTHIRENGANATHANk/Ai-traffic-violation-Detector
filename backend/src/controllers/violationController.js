@@ -76,9 +76,12 @@ exports.generateChallan = async (req, res) => {
 
         // Embed Evidence Image
         // Path: backend/src/controllers -> ../../../ai_service/processed
-        const evidencePath = path.join(__dirname, '../../../ai_service/processed', violation.evidence_image_path);
+        let evidencePath = null;
+        if (violation.evidence_image_path) {
+            evidencePath = path.join(__dirname, '../../../ai_service/processed', violation.evidence_image_path);
+        }
 
-        if (fs.existsSync(evidencePath)) {
+        if (evidencePath && fs.existsSync(evidencePath)) {
             doc.text('EVIDENCE IMAGE:', { underline: true });
             doc.moveDown();
             try {

@@ -100,7 +100,15 @@ const Admin = () => {
             setLastRefresh(new Date());
         } catch (err) {
             console.warn('API unreachable, using demo data:', err.message);
-            setViolations(MOCK_VIOLATIONS);
+            const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
+            // Merge local violations with mocks, ensuring no duplicates by ID
+            const merged = [...localViolations];
+            MOCK_VIOLATIONS.forEach(mock => {
+                if (!merged.find(m => m.id === mock.id)) {
+                    merged.push(mock);
+                }
+            });
+            setViolations(merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
             setIsDemo(true);
             setLastRefresh(new Date());
         } finally {
@@ -119,8 +127,15 @@ const Admin = () => {
             // Demo mode — simulate locally and generate PDF
             setActionLoading(violation.id);
             await new Promise(r => setTimeout(r, 600));
-            setViolations(prev => prev.map(v => v.id === violation.id ? { ...v, status: 'APPROVED' } : v));
             
+            // Update local state and localStorage
+            const updatedViolations = violations.map(v => v.id === violation.id ? { ...v, status: 'APPROVED' } : v);
+            setViolations(updatedViolations);
+            
+            const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
+            const updatedLocal = localViolations.map(v => v.id === violation.id ? { ...v, status: 'APPROVED' } : v);
+            localStorage.setItem('traffic_violations', JSON.stringify(updatedLocal));
+
             import('../utils/pdfGenerator').then(module => {
                 module.generateClientSidePDF(violation, FINES);
                 setActionLoading(null);

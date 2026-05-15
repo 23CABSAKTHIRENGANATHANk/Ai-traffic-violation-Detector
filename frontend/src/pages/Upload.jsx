@@ -33,7 +33,7 @@ const Upload = () => {
     const containerRef = useRef(null);
     const inputRef     = useRef(null);
 
-    const resetState = () => { setResult(null); setFile(null); setProgress(0); setError(null); setIsDemo(false); };
+    const resetState = () => { setResult(null); setFile(null); setProgress(0); setError(null); setIsDemo(false); setStreamUrl(''); };
 
     const handleFile = (f) => {
         if (f && f.type.startsWith('video/')) {
@@ -49,6 +49,27 @@ const Upload = () => {
         setDragOver(false);
         handleFile(e.dataTransfer.files[0]);
     };
+
+    React.useEffect(() => {
+        let interval;
+        if (result && !isDemo && result.video_id) {
+            interval = setInterval(async () => {
+                try {
+                    const res = await fetch(API_CONFIG.ENDPOINTS.VIOLATIONS);
+                    if (res.ok) {
+                        const allViolations = await res.json();
+                        const videoViolations = allViolations.filter(v => v.video_id === result.video_id);
+                        if (videoViolations.length > 0) {
+                            setResult(prev => ({ ...prev, violations: videoViolations }));
+                        }
+                    }
+                } catch (e) {
+                    console.error("Polling error", e);
+                }
+            }, 3000);
+        }
+        return () => clearInterval(interval);
+    }, [result?.video_id, isDemo]);
 
     const handleUpload = async () => {
         if (!file) { setError('Please select a video file first.'); return; }
@@ -69,6 +90,16 @@ const Upload = () => {
             if (res.ok) {
                 const data = await res.json();
                 setProgress(100);
+                // Save to localStorage for Admin panel persistence
+                const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
+                const newViolations = (data.violations || []).map(v => ({
+                    ...v,
+                    id: Date.now() + Math.random(),
+                    status: 'PENDING',
+                    created_at: new Date().toISOString()
+                }));
+                localStorage.setItem('traffic_violations', JSON.stringify([...newViolations, ...localViolations]));
+                
                 setTimeout(() => { setUploading(false); setResult(data); setIsDemo(false); }, 600);
             } else {
                 throw new Error(`Server error: ${res.status}`);
@@ -78,13 +109,31 @@ const Upload = () => {
             setUploading(false);
             // AI service is offline — show demo result
             setProgress(100);
+            
+            // Save demo results to localStorage for persistence
+            const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
+            const newViolations = DEMO_RESULT.violations.map((v, i) => ({
+                ...v,
+                id: Date.now() + i,
+                status: 'PENDING',
+                created_at: new Date().toISOString(),
+                video_id: DEMO_RESULT.video_id
+            }));
+            localStorage.setItem('traffic_violations', JSON.stringify([...newViolations, ...localViolations]));
+
             setTimeout(() => { setResult(DEMO_RESULT); setIsDemo(true); }, 400);
         }
     };
 
-    const getVideoUrl = () => result
-        ? `${API_CONFIG.ENDPOINTS.AI_STREAM}?video_id=${result.video_id}&t=${Date.now()}`
-        : '';
+    const [streamUrl, setStreamUrl] = useState('');
+
+    useEffect(() => {
+        if (result && result.video_id && !streamUrl) {
+            setStreamUrl(`${API_CONFIG.ENDPOINTS.AI_STREAM}?video_id=${result.video_id}&t=${Date.now()}`);
+        }
+    }, [result, streamUrl]);
+
+    const getVideoUrl = () => streamUrl;
 
     return (
         <div className="max-w-5xl mx-auto space-y-8 pb-10">

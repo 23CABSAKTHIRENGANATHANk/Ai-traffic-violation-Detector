@@ -95,7 +95,15 @@ const Admin = () => {
             const res = await fetch(API_CONFIG.ENDPOINTS.VIOLATIONS, { signal: AbortSignal.timeout(5000) });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            setViolations(Array.isArray(data) ? data : []);
+            
+            // Merge backend data with localStorage to ensure Vercel statelessness doesn't wipe our records
+            const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
+            const merged = [...localViolations];
+            (Array.isArray(data) ? data : []).forEach(v => {
+                if (!merged.find(m => m.id === v.id)) merged.push(v);
+            });
+            
+            setViolations(merged.sort((a, b) => new Date(b.created_at || b.timestamp) - new Date(a.created_at || a.timestamp)));
             setIsDemo(false);
             setLastRefresh(new Date());
         } catch (err) {
@@ -123,12 +131,9 @@ const Admin = () => {
     }, [fetchViolations]);
 
     const generateChallan = async (violation) => {
-        if (isDemo) {
-            // Demo mode — simulate locally and generate PDF
-            setActionLoading(violation.id);
-            await new Promise(r => setTimeout(r, 600));
-            
-            // Update local state and localStorage
+        setActionLoading(violation.id);
+        try {
+            // Update local state and localStorage immediately
             const updatedViolations = violations.map(v => v.id === violation.id ? { ...v, status: 'APPROVED' } : v);
             setViolations(updatedViolations);
             
@@ -136,37 +141,35 @@ const Admin = () => {
             const updatedLocal = localViolations.map(v => v.id === violation.id ? { ...v, status: 'APPROVED' } : v);
             localStorage.setItem('traffic_violations', JSON.stringify(updatedLocal));
 
-            import('../utils/pdfGenerator').then(module => {
-                module.generateClientSidePDF(violation, FINES);
-                setActionLoading(null);
-                showNotification(`Challan PDF generated for ${violation.vehicle_plate || 'vehicle'}!`, 'success');
-            }).catch(err => {
-                console.error("Error loading PDF generator", err);
-                setActionLoading(null);
-                showNotification("Failed to generate PDF.", 'error');
-            });
-            return;
-        }
-        setActionLoading(violation.id);
-        try {
-            const res = await fetch(`${API_CONFIG.ENDPOINTS.VIOLATIONS}/${violation.id}/challan`, { method: 'POST' });
-            if (res.ok) {
-                const blob = await res.blob();
-                const url  = window.URL.createObjectURL(blob);
-                const a    = document.createElement('a');
-                a.href     = url;
-                a.download = `Challan_${violation.id}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                fetchViolations(true);
-                showNotification(`Challan PDF generated for ${violation.vehicle_plate}!`, 'success');
-            } else {
-                showNotification('Failed to generate challan. Backend may be offline.', 'error');
+            // Try backend API first
+            if (!isDemo) {
+                try {
+                    const res = await fetch(`${API_CONFIG.ENDPOINTS.VIOLATIONS}/${violation.id}/challan`, { method: 'POST' });
+                    if (res.ok) {
+                        const blob = await res.blob();
+                        const url  = window.URL.createObjectURL(blob);
+                        const a    = document.createElement('a');
+                        a.href     = url;
+                        a.download = `Challan_${violation.id}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        showNotification(`Challan PDF generated for ${violation.vehicle_plate}!`, 'success');
+                        setActionLoading(null);
+                        return;
+                    }
+                } catch (e) {
+                    console.warn("Backend PDF generation failed, falling back to client-side", e);
+                }
             }
+            
+            // Fallback to client-side generation (essential for Vercel stateless mock DB)
+            const module = await import('../utils/pdfGenerator');
+            module.generateClientSidePDF(violation, FINES);
+            showNotification(`Challan PDF generated for ${violation.vehicle_plate || 'vehicle'}!`, 'success');
         } catch (err) {
-            console.error(err);
-            showNotification('Error generating challan.', 'error');
+            console.error("Error generating challan", err);
+            showNotification("Failed to generate PDF.", 'error');
         } finally {
             setActionLoading(null);
         }

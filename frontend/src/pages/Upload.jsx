@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FaCloudUploadAlt, FaVideo, FaCheckCircle, FaSpinner,
@@ -55,12 +55,22 @@ const Upload = () => {
         if (result && !isDemo && result.video_id) {
             interval = setInterval(async () => {
                 try {
-                    const res = await fetch(API_CONFIG.ENDPOINTS.VIOLATIONS);
+                    // Poll the AI service directly since Vercel Backend MockDB is stateless and wipes memory instantly
+                    const aiViolationsUrl = API_CONFIG.ENDPOINTS.AI_DETECT.replace('/detect', '/violations');
+                    const res = await fetch(aiViolationsUrl);
                     if (res.ok) {
                         const allViolations = await res.json();
                         const videoViolations = allViolations.filter(v => v.video_id === result.video_id);
                         if (videoViolations.length > 0) {
                             setResult(prev => ({ ...prev, violations: videoViolations }));
+                            
+                            // Immediately persist to localStorage for Admin panel
+                            const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
+                            const merged = [...localViolations];
+                            videoViolations.forEach(v => {
+                                if (!merged.find(m => m.id === v.id)) merged.push(v);
+                            });
+                            localStorage.setItem('traffic_violations', JSON.stringify(merged));
                         }
                     }
                 } catch (e) {

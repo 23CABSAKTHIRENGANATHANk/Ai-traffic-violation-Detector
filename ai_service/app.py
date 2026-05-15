@@ -16,6 +16,9 @@ import threading
 
 app = FastAPI(title="AI Traffic Violation Detection Service")
 
+# In-Memory Violations Store for Stateless Environments (Vercel fallback)
+global_violations = []
+
 # Allow CORS for direct streaming to frontend
 app.add_middleware(
     CORSMiddleware,
@@ -130,16 +133,21 @@ def report_async(video_id, v_type, track_id, frame_copy, speed, plate_text, vehi
         final_number = plate_text or f"UNKNOWN-{track_id}"
         
         payload = {
+            "id": int(datetime.now().timestamp() * 1000) + random.randint(0, 1000),
             "video_id": video_id,
             "violation_type": v_type,
             "timestamp": datetime.now().isoformat(),
             "confidence": 0.95,
             "speed": speed,
-            "vehicle_number": final_number,
-            "evidence_image": evidence_filename,
-            "vehicle_type": vehicle_type
+            "vehicle_plate": final_number,
+            "evidence_image_path": evidence_filename,
+            "vehicle_type": vehicle_type,
+            "status": "PENDING"
         }
         
+        global_violations.append(payload)
+        
+        # Try reporting to backend, but it's okay if it fails or wipes it (Vercel)
         requests.post(BACKEND_API_URL, json=payload, timeout=2)
         print(f"DEBUG: Reported {v_type} for ID {track_id}")
     except Exception as e:
@@ -367,6 +375,14 @@ def generate_frames(video_path: str, video_id: str):
                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
     cap.release()
+
+@app.get("/violations")
+async def get_violations():
+    """
+    Returns all dynamically detected violations from this session.
+    Used by frontend when backend MockDB is wiped by Serverless.
+    """
+    return global_violations
 
 @app.get("/video_feed")
 async def video_feed(video_id: str):

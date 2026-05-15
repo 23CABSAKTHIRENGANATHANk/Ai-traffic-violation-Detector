@@ -29,7 +29,7 @@
   }
 
   .glass-panel-hover {
-    @apply glass-panel transition-all duration-300 hover:border-white/20 hover:shadow-xl;
+    @apply bg-panel-bg/80 backdrop-blur-md border border-white/10 rounded-xl shadow-lg transition-all duration-300 hover:border-white/20 hover:shadow-xl;
   }
 
   .neon-border {

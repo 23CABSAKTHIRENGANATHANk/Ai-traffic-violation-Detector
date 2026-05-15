@@ -37,8 +37,15 @@ const Dashboard = () => {
             const res = await fetch(API_CONFIG.ENDPOINTS.VIOLATIONS, { signal: AbortSignal.timeout(5000) });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            const violations = Array.isArray(data) ? data : [];
-            computeStats(violations);
+            
+            // Merge backend data with localStorage to ensure Vercel statelessness doesn't wipe our records
+            const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
+            const merged = [...localViolations];
+            (Array.isArray(data) ? data : []).forEach(v => {
+                if (!merged.find(m => m.id === v.id)) merged.push(v);
+            });
+            
+            computeStats(merged.sort((a, b) => new Date(b.created_at || b.timestamp) - new Date(a.created_at || a.timestamp)));
             setIsDemo(false);
         } catch {
             computeStats(MOCK_VIOLATIONS);

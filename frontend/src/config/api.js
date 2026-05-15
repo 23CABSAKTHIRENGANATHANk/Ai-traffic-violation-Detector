@@ -1,6 +1,7 @@
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVICE_URL || 'http://localhost:8000';
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || (isLocal ? 'http://localhost:3000/api' : '/api');
+const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVICE_URL || (isLocal ? 'http://localhost:8000' : 'https://your-hf-space.hf.space');
 
 export const API_CONFIG = {
     BASE_URL: API_BASE_URL,

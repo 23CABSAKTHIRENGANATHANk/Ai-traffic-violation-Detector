@@ -15,6 +15,39 @@ export const API_CONFIG = {
     }
 };
 
+// Error handler
+export const handleError = (error) => {
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+        return {
+            code: 'NETWORK_ERROR',
+            message: 'Network connection failed. Please check your connection.',
+            status: null
+        };
+    }
+    
+    if (error instanceof SyntaxError) {
+        return {
+            code: 'PARSE_ERROR',
+            message: 'Failed to parse server response.',
+            status: null
+        };
+    }
+
+    if (error.response) {
+        return {
+            code: 'HTTP_ERROR',
+            message: error.response.data?.message || error.message,
+            status: error.response.status
+        };
+    }
+
+    return {
+        code: 'UNKNOWN_ERROR',
+        message: error.message || 'An unexpected error occurred',
+        status: null
+    };
+};
+
 // Fetch wrapper with error handling
 export const apiCall = async (url, options = {}) => {
     try {
@@ -27,7 +60,10 @@ export const apiCall = async (url, options = {}) => {
         });
         
         if (!response.ok) {
-            throw new Error(`API Error: ${response.status}`);
+            const errorData = await response.text();
+            const error = new Error(errorData || `HTTP ${response.status}`);
+            error.response = { status: response.status, data: errorData };
+            throw error;
         }
         
         // Handle blob responses (like PDFs)
@@ -39,7 +75,45 @@ export const apiCall = async (url, options = {}) => {
         return await response.json();
     } catch (error) {
         console.error('API Call Error:', error);
-        throw error;
+        throw handleError(error);
+    }
+};
+
+// Upload file with progress
+export const uploadFile = async (file, onProgress) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        const xhr = new XMLHttpRequest();
+        
+        return new Promise((resolve, reject) => {
+            if (onProgress) {
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        onProgress(percentComplete);
+                    }
+                });
+            }
+            
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve(JSON.parse(xhr.responseText));
+                } else {
+                    reject(new Error(`Upload failed with status ${xhr.status}`));
+                }
+            });
+            
+            xhr.addEventListener('error', () => {
+                reject(new Error('Upload failed'));
+            });
+            
+            xhr.open('POST', `${API_BASE_URL}/upload`);
+            xhr.send(formData);
+        });
+    } catch (error) {
+        throw handleError(error);
     }
 };
 

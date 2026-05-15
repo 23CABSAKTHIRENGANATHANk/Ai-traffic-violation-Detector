@@ -1,5 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, BackgroundTasks
 from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import shutil
 import os
@@ -39,6 +40,9 @@ BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://localhost:3000/api/violat
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(PROCESSED_DIR, exist_ok=True)
 os.makedirs(MODELS_DIR, exist_ok=True)
+
+# Mount processed directory to serve evidence images
+app.mount("/processed", StaticFiles(directory=PROCESSED_DIR), name="processed")
 
 # Load Models
 print("Loading YOLOv8n model...")

@@ -165,7 +165,7 @@ const Admin = () => {
             
             // Fallback to client-side generation (essential for Vercel stateless mock DB)
             const module = await import('../utils/pdfGenerator');
-            module.generateClientSidePDF(violation, FINES);
+            await module.generateClientSidePDF(violation, FINES);
             showNotification(`Challan PDF generated for ${violation.vehicle_plate || 'vehicle'}!`, 'success');
         } catch (err) {
             console.error("Error generating challan", err);

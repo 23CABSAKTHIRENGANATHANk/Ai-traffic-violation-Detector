@@ -1,6 +1,19 @@
 import { jsPDF } from "jspdf";
+import { API_CONFIG } from "../config/api";
 
-export const generateClientSidePDF = (challan, FINES) => {
+const fetchImageAsBase64 = async (url) => {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Image not found");
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+};
+
+export const generateClientSidePDF = async (challan, FINES) => {
     const doc = new jsPDF();
     const fine = FINES[challan.violation_type] || 500;
     
@@ -26,7 +39,7 @@ export const generateClientSidePDF = (challan, FINES) => {
     const lineSpacing = 10;
     
     doc.text(`Challan ID: CH-${challan.id}-${Date.now().toString().slice(-4)}`, 20, startY);
-    doc.text(`Date & Time: ${new Date(challan.created_at || Date.now()).toLocaleString()}`, 20, startY + lineSpacing);
+    doc.text(`Date & Time: ${new Date(challan.created_at || challan.timestamp || Date.now()).toLocaleString()}`, 20, startY + lineSpacing);
     doc.text(`Vehicle Number: ${challan.vehicle_plate || 'UNKNOWN'}`, 20, startY + lineSpacing * 2);
     doc.text(`Vehicle Type: ${challan.vehicle_type || 'UNKNOWN'}`, 20, startY + lineSpacing * 3);
     
@@ -51,11 +64,44 @@ export const generateClientSidePDF = (challan, FINES) => {
     doc.setTextColor(200, 0, 0);
     doc.text(`Fine Amount: INR ${fine.toLocaleString()}`, 20, startY + lineSpacing * 11);
 
+    let currentY = startY + lineSpacing * 13;
+
+    // Evidence Image
+    if (challan.evidence_image_path) {
+        try {
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(0, 0, 0);
+            doc.text("EVIDENCE IMAGE:", 20, currentY);
+            
+            const imageUrl = `${API_CONFIG.AI_SERVICE_URL}/processed/${challan.evidence_image_path}`;
+            const base64Img = await fetchImageAsBase64(imageUrl);
+            
+            // Add image (x, y, width, height)
+            doc.addImage(base64Img, 'JPEG', 20, currentY + 5, 170, 95);
+            currentY += 105;
+        } catch (e) {
+            console.warn("Could not load evidence image", e);
+            doc.setFontSize(12);
+            doc.setTextColor(200, 0, 0);
+            doc.text("[EVIDENCE IMAGE NOT FOUND OR OFFLINE]", 20, currentY + 10);
+            currentY += 20;
+        }
+    } else {
+        doc.setFontSize(12);
+        doc.setTextColor(200, 0, 0);
+        doc.text("[NO EVIDENCE IMAGE PROVIDED]", 20, currentY);
+        currentY += 10;
+    }
+
     // Footer note
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
     doc.setTextColor(100, 100, 100);
-    const footerY = 250;
+    
+    // Ensure footer doesn't overflow page
+    const footerY = Math.max(currentY + 20, 260);
+    
     doc.line(20, footerY - 5, 190, footerY - 5);
     doc.text("Notice: This is an automatically generated AI Traffic Violation Challan.", 105, footerY, null, null, "center");
     doc.text("Please pay the fine within 30 days to avoid legal action.", 105, footerY + 5, null, null, "center");

@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-multipart
+# Large dependencies (Risk of Vercel Size Limit Exceeded)
+ultralytics
+opencv-python-headless
+easyocr
+scipy
+pandas
+requests
+filterpy

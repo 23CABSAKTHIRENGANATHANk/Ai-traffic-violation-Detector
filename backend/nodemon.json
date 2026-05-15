@@ -1,0 +1,11 @@
+{
+    "ignore": [
+        "uploads/*",
+        "processed/*",
+        "*.json",
+        "node_modules"
+    ],
+    "watch": [
+        "src"
+    ]
+}

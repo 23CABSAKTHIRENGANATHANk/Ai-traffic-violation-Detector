@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@theme {
+  --color-neon-blue: #00f3ff;
+  --color-neon-green: #00ff9d;
+  --color-neon-red: #ff0055;
+  --color-deep-bg: #050b14;
+  --color-panel-bg: #0a1625;
+
+  --font-sans: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@layer base {
+  body {
+    @apply bg-deep-bg text-gray-100 font-sans;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-panel-bg/80 backdrop-blur-md border border-white/10 rounded-xl shadow-lg;
+  }
+
+  .neon-border {
+    @apply border border-neon-blue/50;
+    box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+  }
+
+  .btn-primary {
+    @apply bg-neon-blue/10 text-neon-blue border border-neon-blue/50 px-4 py-2 rounded-lg hover:bg-neon-blue/20 transition-all duration-300 font-semibold tracking-wide;
+  }
+
+  .btn-danger {
+    @apply bg-neon-red/10 text-neon-red border border-neon-red/50 px-4 py-2 rounded-lg hover:bg-neon-red/20 transition-all duration-300 font-semibold tracking-wide;
+  }
+}

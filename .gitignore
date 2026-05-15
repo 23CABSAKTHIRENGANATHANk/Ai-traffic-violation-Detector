@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+
+# Environment variables
+.env
+
+# Build outputs
+/frontend/dist
+/frontend/build
+
+# IDE
+.vscode/
+*.code-workspace
+
+# Runtime/Temp data
+/ai_service/uploads/*
+/ai_service/processed/*
+/backend/uploads/*
+!/ai_service/uploads/.gitkeep
+!/ai_service/processed/.gitkeep
+!/backend/uploads/.gitkeep
+
+# Large media files (optional, but good practice to allow standard ones if small enough)
+# *.mp4

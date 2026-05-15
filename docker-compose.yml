@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
+
+  backend:
+    build: ./backend
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST=db
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - DB_NAME=traffic_db
+      - PORT=3000
+    depends_on:
+      - db
+    restart: always
+
+  ai_service:
+    build: ./ai_service
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ai_service/uploads:/app/uploads
+      - ./ai_service/processed:/app/processed
+    environment:
+      - BACKEND_API_URL=http://backend:3000/api/violations/internal/record
+    depends_on:
+      - backend
+    restart: always
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=traffic_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+  postgres_data:

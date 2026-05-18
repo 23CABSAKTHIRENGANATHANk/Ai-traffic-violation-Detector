@@ -100,6 +100,29 @@ const Upload = () => {
         return () => clearInterval(interval);
     }, [result?.video_id, isDemo]);
 
+    // Save violation to backend database
+    const saveViolationToDatabase = async (violation) => {
+        try {
+            await fetch(API_CONFIG.ENDPOINTS.VIOLATIONS, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    video_id: violation.video_id,
+                    violation_type: violation.violation_type,
+                    timestamp: violation.created_at || new Date().toISOString(),
+                    confidence_score: violation.confidence_score,
+                    speed_kmph: violation.speed_kmph,
+                    vehicle_plate: violation.vehicle_plate,
+                    vehicle_type: violation.vehicle_type,
+                    location: violation.location,
+                    evidence_image_path: violation.evidence_image_path
+                })
+            });
+        } catch (dbErr) {
+            console.warn('Database save failed, will use localStorage fallback:', dbErr.message);
+        }
+    };
+
     const handleUpload = async () => {
         if (!file) { setError('Please select a video file first.'); return; }
         setUploading(true);
@@ -119,10 +142,19 @@ const Upload = () => {
             if (res.ok) {
                 const data = await res.json();
                 setProgress(100);
-                // Save to localStorage using normalized Admin-compatible schema
+                
+                // Normalize and save violations
                 const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
                 const newViolations = (data.violations || []).map((v, i) => normalizeForStorage(v, i));
+                
+                // Save to localStorage
                 localStorage.setItem('traffic_violations', JSON.stringify([...newViolations, ...localViolations]));
+                
+                // Save each violation to backend database (non-blocking)
+                newViolations.forEach(v => saveViolationToDatabase(v));
+                
+                // Clear the 'cleared' flag so mock data shows if DB is empty
+                localStorage.removeItem('traffic_violations_cleared');
                 
                 setTimeout(() => { setUploading(false); setResult(data); setIsDemo(false); }, 600);
             } else {
@@ -134,12 +166,18 @@ const Upload = () => {
             // AI service is offline — show demo result
             setProgress(100);
             
-            // Save demo results to localStorage using normalized Admin-compatible schema
+            // Save demo results to localStorage
             const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
             const newViolations = DEMO_RESULT.violations.map((v, i) => normalizeForStorage(
                 { ...v, video_id: DEMO_RESULT.video_id }, i
             ));
             localStorage.setItem('traffic_violations', JSON.stringify([...newViolations, ...localViolations]));
+            
+            // Save demo violations to backend database (non-blocking)
+            newViolations.forEach(v => saveViolationToDatabase(v));
+            
+            // Clear the 'cleared' flag so mock data shows if DB is empty
+            localStorage.removeItem('traffic_violations_cleared');
 
             setTimeout(() => { setResult(DEMO_RESULT); setIsDemo(true); }, 400);
         }

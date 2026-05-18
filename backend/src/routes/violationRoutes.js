@@ -3,39 +3,41 @@ const router = express.Router();
 const uploadController = require('../controllers/uploadController');
 const violationController = require('../controllers/violationController');
 const { validateViolation, validateFileUpload, validateQueryParams } = require('../../lib/validators');
+const { requireAdmin } = require('../../lib/auth');
 
 // =============== Public Routes ===============
-// Upload video (returns stream URL)
+// Upload video (returns stream URL) - Auth required
 router.post('/upload', uploadController.uploadVideo);
 
 // =============== Internal Routes (AI Service) ===============
-// Record violation from AI service
+// Record violation from AI service - Auth optional (internal system)
+// In production, use API key or internal network isolation
 router.post('/internal/record', validateViolation, violationController.recordViolation);
 
-// =============== Admin Routes ===============
+// =============== Admin Routes (All require authentication via parent middleware) ===============
 // Get all violations with filters
 router.get('/', validateQueryParams(), violationController.getViolations);
 
 // Get single violation
 router.get('/:id', violationController.getViolationById);
 
-// Generate challan (PDF download)
-router.post('/:id/challan', violationController.generateChallan);
+// Generate challan (PDF download) - Admin only
+router.post('/:id/challan', requireAdmin, violationController.generateChallan);
 
-// Approve violation
-router.patch('/:id/approve', violationController.approveViolation);
+// Approve violation - Admin only
+router.patch('/:id/approve', requireAdmin, violationController.approveViolation);
 
-// Reject violation
-router.patch('/:id/reject', violationController.rejectViolation);
+// Reject violation - Admin only
+router.patch('/:id/reject', requireAdmin, violationController.rejectViolation);
 
-// Update violation status
-router.patch('/:id/status', violationController.updateViolationStatus);
+// Update violation status - Admin only
+router.patch('/:id/status', requireAdmin, violationController.updateViolationStatus);
 
-// Delete violation
-router.delete('/:id', violationController.deleteViolation);
+// Delete violation - Admin only
+router.delete('/:id', requireAdmin, violationController.deleteViolation);
 
-// Bulk operations
-router.patch('/bulk/approve', violationController.bulkApproveViolations);
-router.patch('/bulk/reject', violationController.bulkRejectViolations);
+// Bulk operations - Admin only
+router.patch('/bulk/approve', requireAdmin, violationController.bulkApproveViolations);
+router.patch('/bulk/reject', requireAdmin, violationController.bulkRejectViolations);
 
 module.exports = router;

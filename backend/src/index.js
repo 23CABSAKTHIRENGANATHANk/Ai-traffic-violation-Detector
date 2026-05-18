@@ -3,6 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const { errorHandler, AppError } = require('../lib/errors');
+const { authenticateToken, requireAdmin, rateLimitMiddleware } = require('../lib/auth');
 
 dotenv.config();
 
@@ -11,14 +12,30 @@ const PORT = process.env.PORT || 3000;
 
 // =============== Middleware ===============
 // Security & Parsing
-app.use(cors({
-    origin: process.env.CORS_ORIGIN || '*',
+// Fixed CORS: Allow only frontend origin for security
+const corsOptions = {
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
     credentials: true,
-    optionsSuccessStatus: 200
-}));
+    optionsSuccessStatus: 200,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+};
+app.use(cors(corsOptions));
+
+// Security headers
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    next();
+});
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Rate limiting for all routes
+app.use(rateLimitMiddleware);
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -38,13 +55,14 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/processed', express.static(path.join(__dirname, '../../ai_service/processed')));
 
 // =============== Routes ===============
-// Health check
+// Health check (Public)
 app.get('/', (req, res) => {
     res.json({
         status: 'ok',
         message: 'Traffic Violation Detection Backend API',
         timestamp: new Date().toISOString(),
-        version: '1.0.0'
+        version: '2.0.0',
+        features: ['JWT Authentication', 'Rate Limiting', 'WebSocket Ready', 'Admin Panel']
     });
 });
 
@@ -52,9 +70,14 @@ app.get('/health', (req, res) => {
     res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
+// Authentication Routes (Public)
+const authRoutes = require('./routes/authRoutes');
+app.use('/api/auth', authRoutes);
+
 // Import & Use Routes
 const violationRoutes = require('./routes/violationRoutes');
-app.use('/api/violations', violationRoutes);
+// Protect violation routes with authentication
+app.use('/api/violations', authenticateToken, violationRoutes);
 
 // =============== Error Handling ===============
 // 404 handler

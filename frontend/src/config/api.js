@@ -3,15 +3,34 @@ const isLocal = window.location.hostname === 'localhost' || window.location.host
 const API_BASE_URL = import.meta.env.VITE_API_URL || (isLocal ? 'http://localhost:3000/api' : '/api');
 const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVICE_URL || (isLocal ? 'http://localhost:8000' : 'https://your-hf-space.hf.space');
 
+// JWT Token Management
+export const TokenManager = {
+    getToken: () => localStorage.getItem('auth_token'),
+    setToken: (token) => localStorage.setItem('auth_token', token),
+    removeToken: () => localStorage.removeItem('auth_token'),
+    hasToken: () => !!localStorage.getItem('auth_token'),
+    getHeaders: () => {
+        const token = TokenManager.getToken();
+        return {
+            'Content-Type': 'application/json',
+            ...(token && { 'Authorization': `Bearer ${token}` })
+        };
+    }
+};
+
 export const API_CONFIG = {
     BASE_URL: API_BASE_URL,
     AI_SERVICE_URL: AI_SERVICE_URL,
     ENDPOINTS: {
+        // Authentication endpoints
+        AUTH_LOGIN: `${API_BASE_URL}/auth/login`,
+        AUTH_DEMO_USERS: `${API_BASE_URL}/auth/demo-users`,
+        
         // Violation endpoints
         VIOLATIONS: `${API_BASE_URL}/violations`,
         VIOLATIONS_ALL: `${API_BASE_URL}/violations`,
-        UPLOAD: `${API_BASE_URL}/upload`,
-        RECORD_VIOLATION: `${API_BASE_URL}/violations/record`,
+        UPLOAD: `${API_BASE_URL}/violations/upload`,
+        RECORD_VIOLATION: `${API_BASE_URL}/violations/internal/record`,
         
         // AI Service endpoints
         AI_DETECT: `${AI_SERVICE_URL}/detect`,
@@ -51,6 +70,12 @@ export const handleError = (error) => {
     }
 
     if (error.response) {
+        // Handle 401 Unauthorized - clear token and redirect to login
+        if (error.response.status === 401) {
+            TokenManager.removeToken();
+            window.location.href = '/login';
+        }
+        
         return {
             code: 'HTTP_ERROR',
             message: error.response.data?.message || error.message,
@@ -65,13 +90,13 @@ export const handleError = (error) => {
     };
 };
 
-// Fetch wrapper with error handling
+// Fetch wrapper with error handling and auth headers
 export const apiCall = async (url, options = {}) => {
     try {
         const response = await fetch(url, {
             ...options,
             headers: {
-                'Content-Type': 'application/json',
+                ...TokenManager.getHeaders(),
                 ...options.headers,
             },
         });
@@ -94,6 +119,25 @@ export const apiCall = async (url, options = {}) => {
         console.error('API Call Error:', error);
         throw handleError(error);
     }
+};
+
+// Login function
+export const login = async (username, password) => {
+    const response = await apiCall(API_CONFIG.ENDPOINTS.AUTH_LOGIN, {
+        method: 'POST',
+        body: JSON.stringify({ username, password })
+    });
+    
+    if (response.token) {
+        TokenManager.setToken(response.token);
+    }
+    
+    return response;
+};
+
+// Get demo users
+export const getDemoUsers = async () => {
+    return await apiCall(API_CONFIG.ENDPOINTS.AUTH_DEMO_USERS);
 };
 
 // Upload file with progress

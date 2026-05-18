@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { FaChartPie, FaVideo, FaFileInvoice, FaUserShield, FaSignOutAlt, FaChartBar, FaCog } from 'react-icons/fa';
 import { motion } from 'framer-motion';
+import { TokenManager } from '../config/api';
 
 const Sidebar = () => {
     const navigate = useNavigate();
@@ -13,6 +14,16 @@ const Sidebar = () => {
         { path: '/admin', name: 'Admin Panel', icon: <FaUserShield /> },
         { path: '/settings', name: 'Settings', icon: <FaCog /> },
     ];
+
+    const handleLogout = () => {
+        // Clear JWT token
+        TokenManager.removeToken();
+        // Clear local storage
+        localStorage.setItem('traffic_violations_cleared', 'true');
+        localStorage.removeItem('traffic_violations');
+        // Redirect to home
+        navigate('/');
+    };
 
     return (
         <div className="h-screen w-64 bg-panel-bg border-r border-white/10 flex flex-col p-4 fixed left-0 top-0 z-50">
@@ -47,11 +58,7 @@ const Sidebar = () => {
             </nav>
 
             <button 
-                onClick={() => {
-                    localStorage.setItem('traffic_violations_cleared', 'true');
-                    localStorage.removeItem('traffic_violations');
-                    navigate('/');
-                }}
+                onClick={handleLogout}
                 className="flex items-center gap-4 px-4 py-3 text-red-400 hover:bg-neon-red/10 hover:text-neon-red rounded-xl transition-all duration-300 mt-auto border border-transparent hover:border-neon-red/20"
             >
                 <FaSignOutAlt />

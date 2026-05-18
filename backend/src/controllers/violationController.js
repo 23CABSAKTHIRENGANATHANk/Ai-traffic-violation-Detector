@@ -24,13 +24,81 @@ exports.recordViolation = async (req, res) => {
     }
 };
 
-// 2. List All Violations (Admin)
+// 2. List All Violations (Admin) - With Pagination & Filtering
 exports.getViolations = async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM violations ORDER BY created_at DESC');
-        res.json(result.rows);
+        // Pagination parameters
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(100, parseInt(req.query.limit) || 20); // Max 100 per page
+        const offset = (page - 1) * limit;
+
+        // Filtering parameters
+        const status = req.query.status ? req.query.status.toUpperCase() : null;
+        const violationType = req.query.violationType ? req.query.violationType.toUpperCase() : null;
+        const vehiclePlate = req.query.vehiclePlate ? `%${req.query.vehiclePlate}%` : null;
+        const searchTerm = req.query.search ? `%${req.query.search}%` : null;
+
+        // Build dynamic query
+        let query = 'SELECT * FROM violations WHERE 1=1';
+        const params = [];
+        let paramCount = 0;
+
+        if (status) {
+            paramCount++;
+            query += ` AND status = $${paramCount}`;
+            params.push(status);
+        }
+
+        if (violationType) {
+            paramCount++;
+            query += ` AND violation_type = $${paramCount}`;
+            params.push(violationType);
+        }
+
+        if (vehiclePlate) {
+            paramCount++;
+            query += ` AND vehicle_plate ILIKE $${paramCount}`;
+            params.push(vehiclePlate);
+        }
+
+        if (searchTerm) {
+            paramCount++;
+            query += ` AND (vehicle_plate ILIKE $${paramCount} OR video_id::text ILIKE $${paramCount})`;
+            params.push(searchTerm);
+        }
+
+        // Add ordering and pagination
+        query += ' ORDER BY created_at DESC';
+
+        // Get total count for pagination
+        let countQuery = query.replace('SELECT *', 'SELECT COUNT(*) as total');
+        const countResult = await pool.query(countQuery, params);
+        const total = parseInt(countResult.rows[0].total);
+
+        paramCount++;
+        query += ` LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+        params.push(limit, offset);
+
+        // Get paginated results
+        const result = await pool.query(query, params);
+
+        res.json({
+            success: true,
+            data: result.rows,
+            pagination: {
+                total,
+                page,
+                limit,
+                pages: Math.ceil(total / limit)
+            }
+        });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('Error fetching violations:', err);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to fetch violations',
+            message: err.message 
+        });
     }
 };
 

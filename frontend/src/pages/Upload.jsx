@@ -10,11 +10,30 @@ const DEMO_RESULT = {
     video_id: 'demo_video_01',
     violations_detected: 3,
     violations: [
-        { type: 'OVERSPEEDING', confidence: 0.97, vehicle_plate: 'TN38AB1234', speed_kmph: 88 },
-        { type: 'NO HELMET',    confidence: 0.92, vehicle_plate: 'KA01HJ9988', speed_kmph: 42 },
-        { type: 'TRIPLE RIDING',confidence: 0.85, vehicle_plate: 'MH12CD5678', speed_kmph: 35 },
+        { violation_type: 'OVERSPEEDING',  confidence_score: 0.97, vehicle_plate: 'TN38AB1234', speed_kmph: 88, vehicle_type: 'CAR',        location: 'Main Road - Sector A' },
+        { violation_type: 'NO HELMET',     confidence_score: 0.92, vehicle_plate: 'KA01HJ9988', speed_kmph: 42, vehicle_type: 'MOTORCYCLE', location: 'Junction - Sector B' },
+        { violation_type: 'TRIPLE RIDING', confidence_score: 0.85, vehicle_plate: 'MH12CD5678', speed_kmph: 35, vehicle_type: 'MOTORCYCLE', location: 'Highway - Sector C' },
     ],
 };
+
+// Normalize any violation object to consistent Admin-compatible schema
+const normalizeForStorage = (v, index = 0) => ({
+    id: v.id || (Date.now() + index + Math.random()),
+    video_id: v.video_id || 'uploaded_video',
+    violation_type: v.violation_type || v.type || 'OVERSPEEDING',
+    confidence_score: v.confidence_score !== undefined ? v.confidence_score
+                    : v.confidence  !== undefined ? v.confidence : 0.90,
+    speed_kmph: v.speed_kmph !== undefined ? v.speed_kmph
+              : v.speed     !== undefined ? v.speed : 0,
+    vehicle_plate: v.vehicle_plate || '—',
+    vehicle_type: v.vehicle_type || v.vehicle || (
+        (v.violation_type || v.type) === 'OVERSPEEDING' ? 'CAR' : 'MOTORCYCLE'
+    ),
+    location: v.location || 'N/A',
+    status: v.status || 'PENDING',
+    created_at: v.created_at || v.timestamp || new Date().toISOString(),
+    evidence_image_path: v.evidence_image_path || null,
+});
 
 const VIOLATION_STYLES = {
     'OVERSPEEDING':  'bg-orange-500/15 text-orange-400 border-orange-500/30',
@@ -100,14 +119,9 @@ const Upload = () => {
             if (res.ok) {
                 const data = await res.json();
                 setProgress(100);
-                // Save to localStorage for Admin panel persistence
+                // Save to localStorage using normalized Admin-compatible schema
                 const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
-                const newViolations = (data.violations || []).map(v => ({
-                    ...v,
-                    id: Date.now() + Math.random(),
-                    status: 'PENDING',
-                    created_at: new Date().toISOString()
-                }));
+                const newViolations = (data.violations || []).map((v, i) => normalizeForStorage(v, i));
                 localStorage.setItem('traffic_violations', JSON.stringify([...newViolations, ...localViolations]));
                 
                 setTimeout(() => { setUploading(false); setResult(data); setIsDemo(false); }, 600);
@@ -120,15 +134,11 @@ const Upload = () => {
             // AI service is offline — show demo result
             setProgress(100);
             
-            // Save demo results to localStorage for persistence
+            // Save demo results to localStorage using normalized Admin-compatible schema
             const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
-            const newViolations = DEMO_RESULT.violations.map((v, i) => ({
-                ...v,
-                id: Date.now() + i,
-                status: 'PENDING',
-                created_at: new Date().toISOString(),
-                video_id: DEMO_RESULT.video_id
-            }));
+            const newViolations = DEMO_RESULT.violations.map((v, i) => normalizeForStorage(
+                { ...v, video_id: DEMO_RESULT.video_id }, i
+            ));
             localStorage.setItem('traffic_violations', JSON.stringify([...newViolations, ...localViolations]));
 
             setTimeout(() => { setResult(DEMO_RESULT); setIsDemo(true); }, 400);
@@ -292,17 +302,21 @@ const Upload = () => {
                                 {result.violations?.length > 0 && (
                                     <div className="glass-panel p-5 space-y-3">
                                         <h4 className="text-sm font-semibold text-white mb-3">Detected Violations</h4>
-                                        {result.violations.map((v, i) => (
-                                            <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5">
-                                                <div className="flex items-center gap-3">
-                                                    <span className={`px-2 py-0.5 rounded text-xs font-bold border ${VIOLATION_STYLES[v.type] || 'bg-gray-500/15 text-gray-400 border-gray-500/30'}`}>
-                                                        {v.type}
-                                                    </span>
-                                                    <span className="text-xs font-mono text-gray-300">{v.vehicle_plate || '—'}</span>
+                                        {result.violations.map((v, i) => {
+                                            const vType = v.violation_type || v.type;
+                                            const vConf = v.confidence_score !== undefined ? v.confidence_score : v.confidence;
+                                            return (
+                                                <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className={`px-2 py-0.5 rounded text-xs font-bold border ${VIOLATION_STYLES[vType] || 'bg-gray-500/15 text-gray-400 border-gray-500/30'}`}>
+                                                            {vType}
+                                                        </span>
+                                                        <span className="text-xs font-mono text-gray-300">{v.vehicle_plate || '—'}</span>
+                                                    </div>
+                                                    <span className="text-xs text-green-400 font-mono">{((vConf || 0.9) * 100).toFixed(0)}%</span>
                                                 </div>
-                                                <span className="text-xs text-green-400 font-mono">{(v.confidence * 100).toFixed(0)}%</span>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                         <p className="text-xs text-gray-600 pt-2">
                                             View full records in the <a href="/admin" className="text-cyan-400 hover:underline">Admin Panel →</a>
                                         </p>

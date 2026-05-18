@@ -194,6 +194,10 @@ const Admin = () => {
 
             const normalized = merged.map(v => normalizeViolation(v));
 
+            // Automatic local storage self-healing/migration logic
+            const localOnly = normalized.filter(v => v.id !== 1 && v.id !== 2 && v.id !== 3);
+            localStorage.setItem('traffic_violations', JSON.stringify(localOnly));
+
             const sorted = normalized.sort((a, b) => {
                 const aVal = a[sortBy] || 0;
                 const bVal = b[sortBy] || 0;
@@ -210,6 +214,11 @@ const Admin = () => {
             const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
             const merged = [...localViolations, ...MOCK_VIOLATIONS];
             const normalized = merged.map(v => normalizeViolation(v));
+            
+            // Automatic local storage self-healing/migration logic
+            const localOnly = normalized.filter(v => v.id !== 1 && v.id !== 2 && v.id !== 3);
+            localStorage.setItem('traffic_violations', JSON.stringify(localOnly));
+            
             setViolations(normalized);
             setIsDemo(true);
             setLastRefresh(new Date());

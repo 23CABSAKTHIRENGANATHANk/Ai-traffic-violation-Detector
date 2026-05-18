@@ -106,3 +106,146 @@ exports.generateChallan = async (req, res) => {
         if (!res.headersSent) res.status(500).json({ error: 'Challan creation failed' });
     }
 };
+
+// 4. Get Single Violation by ID
+exports.getViolationById = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const result = await pool.query('SELECT * FROM violations WHERE id = $1', [id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Violation not found' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error fetching violation:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// 5. Approve Violation
+exports.approveViolation = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const result = await pool.query(
+            'UPDATE violations SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+            ['APPROVED', id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Violation not found' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error approving violation:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// 6. Reject Violation
+exports.rejectViolation = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const result = await pool.query(
+            'UPDATE violations SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+            ['REJECTED', id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Violation not found' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error rejecting violation:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// 7. Update Violation Status
+exports.updateViolationStatus = async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status) {
+        return res.status(400).json({ error: 'Status is required' });
+    }
+
+    try {
+        const result = await pool.query(
+            'UPDATE violations SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+            [status, id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Violation not found' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error updating violation status:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// 8. Delete Violation (Soft Delete)
+exports.deleteViolation = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const result = await pool.query(
+            'UPDATE violations SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+            ['DELETED', id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Violation not found' });
+        }
+        res.json({ message: 'Violation deleted successfully', violation: result.rows[0] });
+    } catch (err) {
+        console.error('Error deleting violation:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// 9. Bulk Approve Violations
+exports.bulkApproveViolations = async (req, res) => {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: 'Valid array of IDs is required' });
+    }
+
+    try {
+        const result = await pool.query(
+            'UPDATE violations SET status = $1, updated_at = NOW() WHERE id = ANY($2) RETURNING *',
+            ['APPROVED', ids]
+        );
+        res.json({ 
+            message: `${result.rows.length} violations approved`,
+            violations: result.rows 
+        });
+    } catch (err) {
+        console.error('Error bulk approving violations:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// 10. Bulk Reject Violations
+exports.bulkRejectViolations = async (req, res) => {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: 'Valid array of IDs is required' });
+    }
+
+    try {
+        const result = await pool.query(
+            'UPDATE violations SET status = $1, updated_at = NOW() WHERE id = ANY($2) RETURNING *',
+            ['REJECTED', ids]
+        );
+        res.json({ 
+            message: `${result.rows.length} violations rejected`,
+            violations: result.rows 
+        });
+    } catch (err) {
+        console.error('Error bulk rejecting violations:', err);
+        res.status(500).json({ error: err.message });
+    }
+};

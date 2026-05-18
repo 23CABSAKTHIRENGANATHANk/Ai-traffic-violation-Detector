@@ -1,5 +1,39 @@
 {
+    "version": 2,
+    "buildCommand": "npm run build",
+    "outputDirectory": "dist",
+    "env": {
+        "VITE_API_URL": "@vite_api_url",
+        "VITE_AI_SERVICE_URL": "@vite_ai_service_url"
+    },
     "rewrites": [
-        { "source": "/(.*)", "destination": "/index.html" }
+        {
+            "source": "/(.*)",
+            "destination": "/index.html"
+        }
+    ],
+    "headers": [
+        {
+            "source": "/api/(.*)",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "no-cache, no-store, must-revalidate"
+                },
+                {
+                    "key": "Access-Control-Allow-Origin",
+                    "value": "*"
+                }
+            ]
+        },
+        {
+            "source": "/assets/(.*)",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=31536000, immutable"
+                }
+            ]
+        }
     ]
 }

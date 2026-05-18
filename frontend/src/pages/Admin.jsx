@@ -221,6 +221,7 @@ const Admin = () => {
             setCurrentPage(1);
         } catch (err) {
             console.warn('API unreachable, using fallback:', err.message);
+            const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
             const isCleared = localStorage.getItem('traffic_violations_cleared') === 'true';
             const merged = isCleared ? localViolations : [...localViolations, ...MOCK_VIOLATIONS];
             const normalized = merged.map(v => normalizeViolation(v));

@@ -261,19 +261,32 @@ const Upload = () => {
                                 className="space-y-4"
                             >
                                 {/* Status header */}
-                                <div className="glass-panel p-5 flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center text-green-400 text-2xl flex-shrink-0">
-                                        <FaCheckCircle />
+                                <div className="glass-panel p-5 flex items-center gap-4 border-l-4 border-l-cyan-500 shadow-[0_0_20px_rgba(0,243,255,0.05)]">
+                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl flex-shrink-0
+                                        ${isDemo ? 'bg-green-500/10 border border-green-500/30 text-green-400' : 'bg-cyan-500/10 border border-cyan-500/30 text-cyan-400'}`}>
+                                        {isDemo ? <FaCheckCircle /> : <FaSpinner className="animate-spin" />}
                                     </div>
                                     <div className="flex-1">
-                                        <h3 className="text-white font-bold">Analysis Complete!</h3>
-                                        <p className="text-xs text-gray-500 mt-0.5">
-                                            {result.violations?.length || 0} violation{(result.violations?.length || 0) !== 1 ? 's' : ''} detected
-                                            {isDemo && <span className="ml-2 text-amber-400">— Demo Mode</span>}
+                                        <h3 className="text-white font-bold tracking-wide flex items-center gap-2">
+                                            {isDemo ? 'Surveillance Simulation Complete' : (
+                                                <span className="flex items-center gap-2">
+                                                    <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
+                                                    Active Live AI Surveillance
+                                                </span>
+                                            )}
+                                        </h3>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            {isDemo ? (
+                                                `✓ ${(result.violations?.length || 0)} violation${(result.violations?.length || 0) !== 1 ? 's' : ''} detected & logged.`
+                                            ) : (
+                                                <span className="text-cyan-400 font-medium">
+                                                    ⚡ Monitoring frame stream... {(result.violations?.length || 0)} violation${(result.violations?.length || 0) !== 1 ? 's' : ''} captured live.
+                                                </span>
+                                            )}
                                         </p>
                                     </div>
-                                    <button onClick={resetState} className="text-xs text-gray-500 hover:text-white flex items-center gap-1.5 transition-colors">
-                                        <FaRedo /> New Video
+                                    <button onClick={resetState} className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-gray-400 hover:text-white flex items-center gap-1.5 transition-colors font-semibold">
+                                        <FaRedo /> Reset Feed
                                     </button>
                                 </div>
 

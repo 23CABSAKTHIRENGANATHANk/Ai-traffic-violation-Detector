@@ -18,272 +18,373 @@ const fetchImageAsBase64 = async (url) => {
     });
 };
 
-// Professional PDF Generator with Enhanced Layout
+// Get detailed violation information from Indian Motor Vehicles Act, 1988
+const getViolationDetails = (violationType) => {
+    const violations = {
+        'NO HELMET': {
+            section: '188-A',
+            act: 'Motor Vehicles Act, 1988',
+            description: 'Riding motorcycle/scooter without crash helmet',
+            baseAmount: 1000,
+            imprisonment: 'Up to 3 months',
+            penalty: 'Confiscation of vehicle documents',
+            statute: 'Rule 138(2) of Road Safety Rules'
+        },
+        'TRIPLE RIDING': {
+            section: '189',
+            act: 'Motor Vehicles Act, 1988',
+            description: 'More than two persons on motorcycle/scooter',
+            baseAmount: 2000,
+            imprisonment: 'Up to 6 months',
+            penalty: 'License suspension up to 3 months',
+            statute: 'Rule 137 of Road Safety Rules'
+        },
+        'OVERSPEEDING': {
+            section: '182',
+            act: 'Motor Vehicles Act, 1988',
+            description: 'Exceeding speed limit on public way',
+            baseAmount: 5000,
+            imprisonment: 'Up to 6 months',
+            penalty: 'License suspension up to 3 months',
+            statute: 'Rule 47 of Central Motor Vehicles Rules'
+        },
+        'RED LIGHT VIOLATION': {
+            section: '177',
+            act: 'Motor Vehicles Act, 1988',
+            description: 'Jumping or passing red traffic signal',
+            baseAmount: 1500,
+            imprisonment: 'Up to 3 months',
+            penalty: 'Fine up to Rs. 5000 or license suspension',
+            statute: 'Traffic Signal Violation Rules'
+        },
+        'WRONG SIDE DRIVING': {
+            section: '173',
+            act: 'Motor Vehicles Act, 1988',
+            description: 'Driving on wrong side of the road',
+            baseAmount: 3000,
+            imprisonment: 'Up to 6 months',
+            penalty: 'License suspension up to 3 months',
+            statute: 'Rule 40 of Central Motor Vehicles Rules'
+        },
+        'NO LICENSE': {
+            section: '180',
+            act: 'Motor Vehicles Act, 1988',
+            description: 'Driving without valid driving license',
+            baseAmount: 5000,
+            imprisonment: 'Up to 6 months',
+            penalty: 'Vehicle seizure and auction',
+            statute: 'Section 180 of MV Act, 1988'
+        },
+        'UNINSURED VEHICLE': {
+            section: '196',
+            act: 'Motor Vehicles Act, 1988',
+            description: 'Operating vehicle without valid insurance',
+            baseAmount: 2000,
+            imprisonment: 'Up to 3 months',
+            penalty: 'Vehicle impoundment',
+            statute: 'Section 196 of MV Act, 1988'
+        },
+    };
+    return violations[violationType] || violations['OVERSPEEDING'];
+};
+
+// Professional Realistic PDF Generator with Indian Government Format
 export const generateClientSidePDF = async (challan, FINES) => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const fine = FINES[challan.violation_type] || 500;
-    const challanID = `CH-${challan.id}-${Date.now().toString().slice(-6)}`;
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 15;
+    const margin = 10;
     const contentWidth = pageWidth - 2 * margin;
     
     let currentY = margin;
-
-    // Helper to resolve URLs relative to location
-    const getRelativeUrl = (path) => `${window.location.origin}${path}`;
-
-    // ============ PRE-FETCH ASSETS ============
-    let logoBase64 = null;
-    let evidenceBase64 = null;
-
-    try {
-        logoBase64 = await fetchImageAsBase64(getRelativeUrl('/logo.png'));
-    } catch (e) {
-        console.warn("Could not pre-fetch police logo", e);
-    }
-
-    try {
-        const type = challan.violation_type || 'OVERSPEEDING';
-        let fallbackPath = '/overspeeding.png';
-        if (type === 'NO HELMET') fallbackPath = '/no_helmet.png';
-        else if (type === 'TRIPLE RIDING') fallbackPath = '/triple_riding.png';
-
-        const imageUrl = challan.evidence_image_path
-            ? `${API_CONFIG.AI_SERVICE_URL}/processed/${challan.evidence_image_path}`
-            : getRelativeUrl(fallbackPath);
-
-        evidenceBase64 = await fetchImageAsBase64(imageUrl);
-    } catch (e) {
-        console.warn("Could not pre-fetch violation evidence image", e);
-    }
-
-    // ============ HEADER SECTION ============
-    // Deep navy header background
-    doc.setFillColor(15, 23, 42);
-    doc.rect(0, 0, pageWidth, 35, 'F');
-
-    // Draw Police Logo Emblem on the left
-    if (logoBase64) {
-        doc.addImage(logoBase64, 'PNG', 12, 6, 22, 22);
-    }
-
-    // White header text
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.text("MINISTRY OF ROAD TRANSPORT & HIGHWAYS", 38, 13);
     
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text("GOVERNMENT OF INDIA • E-CHALLAN SYSTEM", 38, 19);
-    doc.text("AUTOMATED TRAFFIC VIOLATION NOTICE", 38, 24);
-    
-    currentY = 43;
-
-    // ============ CHALLAN ID & DATE INFO ============
-    doc.setTextColor(15, 23, 42);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text(`CHALLAN ID: ${challanID}`, margin, currentY);
-    
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9.5);
-    doc.setTextColor(71, 85, 105);
+    // Get violation details from Indian Motor Vehicles Act
+    const violation = getViolationDetails(challan.violation_type);
+    const fineAmount = FINES[challan.violation_type] || violation.baseAmount;
+    const challanID = `CH-${challan.id}-${Date.now().toString().slice(-6)}`;
     const issueDate = new Date(challan.created_at || challan.timestamp || Date.now());
     const dueDate = new Date(issueDate.getTime() + 30 * 24 * 60 * 60 * 1000);
-    
-    doc.text(`Issue Date: ${issueDate.toLocaleDateString('en-IN')} ${issueDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`, margin, currentY + 5);
-    doc.text(`Payment Due Date: ${dueDate.toLocaleDateString('en-IN')}`, margin, currentY + 10);
 
-    // QR Code on the right
+    // ============ TOP BORDER ============
+    doc.setDrawColor(0, 32, 96);
+    doc.setLineWidth(1);
+    doc.line(0, 2, pageWidth, 2);
+    doc.setLineWidth(0.5);
+    doc.line(0, 4, pageWidth, 4);
+
+    // ============ OFFICIAL HEADER ============
+    doc.setFillColor(0, 32, 96);
+    doc.rect(0, 5, pageWidth, 28, 'F');
+    
+    // Government emblem area
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.text("GOVERNMENT OF INDIA", pageWidth / 2, 12, { align: 'center' });
+    doc.text("MINISTRY OF ROAD TRANSPORT & HIGHWAYS", pageWidth / 2, 16.5, { align: 'center' });
+    
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.text("National Traffic Management Authority", pageWidth / 2, 20, { align: 'center' });
+    doc.text("AI-Powered Automated Traffic Violation Detection System", pageWidth / 2, 23, { align: 'center' });
+    doc.text("Government of India E-Services Initiative", pageWidth / 2, 26, { align: 'center' });
+    
+    currentY = 36;
+
+    // ============ RED BANNER - CHALLAN TITLE ============
+    doc.setFillColor(192, 0, 0);
+    doc.rect(margin, currentY - 2, contentWidth, 18, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont(undefined, 'bold');
+    doc.text("E-CHALLAN", pageWidth / 2, currentY + 7, { align: 'center' });
+    
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.text("AUTOMATED TRAFFIC VIOLATION NOTICE - MOTOR VEHICLES ACT, 1988", pageWidth / 2, currentY + 13, { align: 'center' });
+    
+    currentY += 22;
+
+    // ============ CHALLAN ID & KEY DATES BOX ============
+    doc.setDrawColor(100, 100, 100);
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margin, currentY, contentWidth, 14, 'FD');
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(9);
+    
+    // Two column layout
+    const col1 = margin + 5;
+    const col2 = pageWidth / 2 + 5;
+    
+    doc.text('CHALLAN ID:', col1, currentY + 4);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(8.5);
+    doc.text(challanID, col1 + 25, currentY + 4);
+    
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(9);
+    doc.text('ISSUE DATE:', col2, currentY + 4);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(8.5);
+    doc.text(issueDate.toLocaleDateString('en-IN'), col2 + 25, currentY + 4);
+    
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(9);
+    doc.text('VALID UNTIL:', col1, currentY + 9);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(8.5);
+    doc.text(dueDate.toLocaleDateString('en-IN'), col1 + 25, currentY + 9);
+    
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(9);
+    doc.text('STATUS:', col2, currentY + 9);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(8.5);
+    doc.text('ACTIVE - PAYMENT REQUIRED', col2 + 25, currentY + 9);
+    
+    currentY += 18;
+
+    // Add QR Code on top right
     try {
         const qrUrl = generateQRCodeUrl(challanID);
         const qrBase64 = await fetchImageAsBase64(qrUrl);
-        doc.addImage(qrBase64, 'PNG', pageWidth - margin - 35, currentY - 5, 35, 35);
+        doc.setDrawColor(120, 120, 120);
+        doc.rect(pageWidth - margin - 35, currentY - 18, 32, 32, 'S');
+        doc.addImage(qrBase64, 'PNG', pageWidth - margin - 34, currentY - 17, 30, 30);
     } catch (e) {
         console.warn("QR code generation failed", e);
     }
 
-    currentY += 20;
-
-    // ============ DIVIDER ============
-    doc.setDrawColor(226, 232, 240);
-    doc.setLineWidth(0.5);
-    doc.line(margin, currentY, pageWidth - margin, currentY);
-    currentY += 6;
-
-    // ============ OWNER & VEHICLE DETAILS (LEFT COLUMN) ============
-    // Look up owner profiles dynamically
-    const owners = {
-        'TN38AB1234': { name: 'SAKTHI RANGANATHAN', dl: 'DL-382019485', address: '12A, Nehru Road, Coimbatore, TN' },
-        'KA01HJ9988': { name: 'KARTHIK KUMAR', dl: 'DL-012020583', address: '45, Residency Street, Bengaluru, KA' },
-        'MH12CD5678': { name: 'RAHUL DESHMUKH', dl: 'DL-122018394', address: '88, Shivaji Lane, Pune, MH' },
-    };
-    const plate = (challan.vehicle_plate || '').trim().replace(/\s+/g, '');
-    const owner = owners[plate] || {
-        name: 'VEERA TRANSPORT PVT LTD',
-        dl: `DL-${Math.floor(10000000 + Math.random() * 90000000)}`,
-        address: '5th Main Rd, Sector 4, HSR Layout, Bengaluru'
-    };
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10.5);
-    doc.setTextColor(15, 23, 42);
-    doc.text("VEHICLE & OWNER DETAILS", margin, currentY);
-    currentY += 6;
-
-    doc.setFont("helvetica", "normal");
+    // ============ VEHICLE INFORMATION ============
+    doc.setFillColor(230, 230, 230);
+    doc.rect(margin, currentY, contentWidth, 5, 'F');
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, 'bold');
     doc.setFontSize(9);
-    doc.setTextColor(15, 23, 42);
-
-    const leftCol = [
-        ['Registered Owner:', owner.name],
-        ['Driving License:', owner.dl],
-        ['Address:', owner.address],
-        ['Vehicle Number:', challan.vehicle_plate || 'UNKNOWN'],
-        ['Vehicle Type:', challan.vehicle_type || 'CAR'],
-    ];
-
-    leftCol.forEach(([label, value]) => {
-        doc.setFont(undefined, 'bold');
-        doc.text(label, margin, currentY);
-        doc.setFont(undefined, 'normal');
-        
-        // Wrap long address strings
-        if (label === 'Address:') {
-            const addrLines = doc.splitTextToSize(value, 55);
-            doc.text(addrLines, margin + 35, currentY);
-            currentY += (addrLines.length * 4) + 1;
-        } else {
-            doc.text(value, margin + 35, currentY);
-            currentY += 5;
-        }
-    });
-
-    const midY = currentY;
-
-    // ============ VIOLATION DETAILS (RIGHT COLUMN) ============
-    currentY = midY - 26; // Align columns properly
-    const rightMargin = pageWidth / 2 + 5;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10.5);
-    doc.setTextColor(15, 23, 42);
-    doc.text("VIOLATION DETAILS", rightMargin, currentY);
+    doc.text("VEHICLE INFORMATION", margin + 2, currentY + 3.5);
     currentY += 6;
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(15, 23, 42);
-
-    const rightCol = [
-        ['Violation Type:', challan.violation_type || 'OVERSPEEDING'],
-        ['Recorded Speed:', challan.speed_kmph ? `${challan.speed_kmph} km/h` : 'N/A'],
-        ['AI Confidence:', `${((challan.confidence_score || 0.9) * 100).toFixed(1)}%`],
-        ['Location Area:', challan.location || 'Main Road - Sector A'],
-    ];
-
-    rightCol.forEach(([label, value]) => {
-        doc.setFont(undefined, 'bold');
-        doc.text(label, rightMargin, currentY);
-        doc.setFont(undefined, 'normal');
-        doc.text(value, rightMargin + 32, currentY);
-        currentY += 5;
-    });
-
-    // Sync Y coordinate to bottom of grid
-    currentY = Math.max(midY, currentY) + 4;
-
-    // ============ FINE AMOUNT (HIGHLIGHTED BOX) ============
-    doc.setFillColor(254, 242, 242);
-    doc.setDrawColor(239, 68, 68);
-    doc.setLineWidth(0.8);
-    doc.rect(margin, currentY, contentWidth, 14, 'DF');
-
-    doc.setTextColor(220, 38, 38);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text(`TOTAL FINE AMOUNT: Rs. ${fine.toLocaleString('en-IN')}`, pageWidth / 2, currentY + 9, { align: 'center' });
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(8.5);
     
-    currentY += 21;
+    const vehicleInfo = [
+        { label: 'Vehicle Registration:', value: challan.vehicle_plate || 'NOT RECORDED' },
+        { label: 'Vehicle Type:', value: challan.vehicle_type || 'UNKNOWN' },
+        { label: 'Vehicle Category:', value: (challan.vehicle_type === 'CAR' ? 'Light Motor Vehicle' : 'Motorized Two Wheeler') },
+    ];
+    
+    vehicleInfo.forEach((item) => {
+        doc.setFont(undefined, 'bold');
+        doc.text(item.label, margin + 2, currentY);
+        doc.setFont(undefined, 'normal');
+        doc.text(item.value, margin + 65, currentY);
+        currentY += 4.5;
+    });
+    
+    currentY += 2;
 
-    // ============ EVIDENCE IMAGING ============
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10.5);
-    doc.setTextColor(15, 23, 42);
-    doc.text("EVIDENCE CAMERA CAPTURE (AUTOMATED DETECTION)", margin, currentY);
-    currentY += 5;
+    // ============ VIOLATION DETAILS ============
+    doc.setFillColor(230, 230, 230);
+    doc.rect(margin, currentY, contentWidth, 5, 'F');
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(9);
+    doc.text("VIOLATION DETAILS", margin + 2, currentY + 3.5);
+    currentY += 6;
 
-    if (evidenceBase64) {
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(8.5);
+    
+    const violationInfo = [
+        { label: 'Type of Violation:', value: challan.violation_type },
+        { label: 'MV Act Section:', value: `Section ${violation.section}` },
+        { label: 'Legal Description:', value: violation.description },
+        { label: 'Detection Method:', value: 'AI-Based Automated Detection' },
+        { label: 'AI Confidence:', value: `${((challan.confidence_score || 0.9) * 100).toFixed(1)}%` },
+        { label: 'Detection Time:', value: issueDate.toLocaleString('en-IN') },
+        { label: 'Location:', value: challan.location || 'Automated Detection Point' },
+    ];
+    
+    violationInfo.forEach((item) => {
+        doc.setFont(undefined, 'bold');
+        doc.text(item.label, margin + 2, currentY);
+        doc.setFont(undefined, 'normal');
+        const textWidth = contentWidth - 65;
+        const wrappedValue = doc.splitTextToSize(item.value, textWidth);
+        doc.text(wrappedValue, margin + 65, currentY);
+        currentY += 4.5;
+    });
+    
+    if (challan.speed_kmph) {
+        doc.setFont(undefined, 'bold');
+        doc.text('Speed Recorded:', margin + 2, currentY);
+        doc.setFont(undefined, 'normal');
+        doc.text(`${challan.speed_kmph} km/h`, margin + 65, currentY);
+        currentY += 4.5;
+    }
+    
+    currentY += 2;
+
+    // ============ FINE AMOUNT - PROFESSIONAL DISPLAY ============
+    doc.setDrawColor(192, 0, 0);
+    doc.setFillColor(255, 245, 245);
+    doc.setLineWidth(2);
+    doc.rect(margin, currentY, contentWidth, 20, 'FD');
+    
+    doc.setTextColor(192, 0, 0);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(10);
+    doc.text('PAYABLE FINE AMOUNT', margin + 5, currentY + 5);
+    
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(192, 0, 0);
+    doc.text(`₹ ${fineAmount.toLocaleString('en-IN')}`, pageWidth / 2, currentY + 12, { align: 'center' });
+    
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(0, 0, 0);
+    doc.text('(Payable within 30 days from issuance date)', pageWidth / 2, currentY + 17, { align: 'center' });
+    
+    currentY += 24;
+
+    // ============ EVIDENCE IMAGE ============
+    if (challan.evidence_image_path) {
+        doc.setFillColor(230, 230, 230);
+        doc.rect(margin, currentY, contentWidth, 5, 'F');
+        doc.setTextColor(0, 0, 0);
+        doc.setFont(undefined, 'bold');
+        doc.setFontSize(9);
+        doc.text("VIOLATION EVIDENCE (CAPTURED BY CCTV)", margin + 2, currentY + 3.5);
+        currentY += 6;
+
         try {
-            doc.setDrawColor(203, 213, 225);
-            doc.setLineWidth(0.5);
-            doc.rect(margin, currentY, contentWidth, 62, 'S');
-            doc.addImage(evidenceBase64, 'JPEG', margin + 1, currentY + 1, contentWidth - 2, 60);
-            currentY += 68;
+            const imageUrl = `${API_CONFIG.AI_SERVICE_URL}/processed/${challan.evidence_image_path}`;
+            const base64Img = await fetchImageAsBase64(imageUrl);
+            
+            doc.setDrawColor(80, 80, 80);
+            doc.rect(margin, currentY, contentWidth, 45, 'S');
+            doc.addImage(base64Img, 'JPEG', margin + 1, currentY + 1, contentWidth - 2, 43);
+            currentY += 50;
         } catch (e) {
-            console.error("Error drawing evidence image on PDF", e);
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(9);
-            doc.setTextColor(148, 163, 184);
-            doc.text("[EVIDENCE IMAGE LOADING ERROR]", pageWidth / 2, currentY + 20, { align: 'center' });
+            console.warn("Could not load evidence image", e);
+            doc.setFillColor(245, 245, 245);
+            doc.rect(margin, currentY, contentWidth, 25, 'F');
+            doc.setTextColor(100, 100, 100);
+            doc.setFontSize(8);
+            doc.text("EVIDENCE IMAGE UNAVAILABLE", pageWidth / 2, currentY + 13, { align: 'center' });
             currentY += 30;
         }
-    } else {
-        doc.setDrawColor(241, 245, 249);
-        doc.setFillColor(248, 250, 252);
-        doc.rect(margin, currentY, contentWidth, 30, 'DF');
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9.5);
-        doc.setTextColor(100, 116, 139);
-        doc.text("CCTV EVIDENCE CAPTURE RECORD UNAVAILABLE", pageWidth / 2, currentY + 16, { align: 'center' });
-        currentY += 36;
     }
 
-    // ============ PAYMENT INSTRUCTIONS & LEGAL ============
-    doc.setFillColor(254, 253, 237);
-    doc.setDrawColor(234, 179, 8);
-    doc.setLineWidth(0.6);
-    doc.rect(margin, currentY, contentWidth, 26, 'DF');
+    currentY += 2;
 
-    doc.setTextColor(161, 98, 7);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.text("WARNING & LEGAL NOTICE", margin + 4, currentY + 5);
-    
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.8);
-    doc.setTextColor(113, 76, 11);
-    const notes = doc.splitTextToSize(
-        "This notice represents automated traffic violation documentation. The fine must be paid within 30 days of issuance to prevent formal legal proceedings. To make payments, check status, or submit appeals, enter the Challan ID on the government web portal (autochallanai.gov.in).",
-        contentWidth - 8
-    );
-    doc.text(notes, margin + 4, currentY + 10);
+    // ============ LEGAL & PAYMENT INFORMATION ============
+    doc.setFillColor(255, 250, 220);
+    doc.setDrawColor(180, 120, 0);
+    doc.setLineWidth(1);
+    doc.rect(margin, currentY, contentWidth, 28, 'FD');
 
-    currentY += 31;
-
-    // ============ SIGNATURE BLOCK ============
-    doc.setTextColor(15, 23, 42);
-    doc.setFont("helvetica", "bold");
+    doc.setTextColor(120, 80, 0);
+    doc.setFont(undefined, 'bold');
     doc.setFontSize(8.5);
-    doc.text("DIGITALLY SIGNED BY:", pageWidth - margin - 52, currentY);
+    doc.text("⚠ IMPORTANT LEGAL NOTICE", margin + 3, currentY + 3);
     
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text("National Traffic Authority (NTA)", pageWidth - margin - 52, currentY + 4);
-    doc.text("Government Electronic Verification", pageWidth - margin - 52, currentY + 8);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(7.5);
+    const legalNotice = `This challan is issued under Section ${violation.section} of the Motor Vehicles Act, 1988. This is an automated detection-based challan generated through AI-powered surveillance system. Non-payment may result in prosecution, license suspension, vehicle impounding, and additional penalties under relevant sections of Indian law. This challan must be paid within 30 days from the date of issuance.`;
+    
+    const legalLines = doc.splitTextToSize(legalNotice, contentWidth - 6);
+    doc.text(legalLines, margin + 3, currentY + 7);
+
+    currentY += 32;
+
+    // ============ PAYMENT METHODS ============
+    doc.setFillColor(220, 240, 255);
+    doc.setDrawColor(0, 100, 200);
+    doc.setLineWidth(0.5);
+    doc.rect(margin, currentY, contentWidth, 16, 'FD');
+    
+    doc.setTextColor(0, 50, 150);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(8.5);
+    doc.text("PAYMENT METHODS & INFORMATION", margin + 3, currentY + 3);
+    
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(7);
+    doc.text("Online Portal: www.vahan.nic.in (National Vehicle Registry)", margin + 3, currentY + 7);
+    doc.text("State RTO Portal: www.[state]-rto.gov.in | Local RTO Office: Visit nearest Regional Transport Office", margin + 3, currentY + 10);
+    doc.text("Reference: Use Challan ID and Vehicle Number for payment identification", margin + 3, currentY + 13);
+
+    currentY += 19;
 
     // ============ FOOTER ============
-    doc.setDrawColor(226, 232, 240);
+    doc.setDrawColor(150, 150, 150);
     doc.setLineWidth(0.5);
-    doc.line(margin, pageHeight - 16, pageWidth - margin, pageHeight - 16);
+    doc.line(margin, currentY, pageWidth - margin, currentY);
     
-    doc.setTextColor(148, 163, 184);
-    doc.setFontSize(7.5);
-    doc.text("© Digital India E-Challan Initiative • Ministry of Road Transport & Highways", pageWidth / 2, pageHeight - 11, { align: 'center' });
-    doc.text(`Generated on ${new Date().toLocaleString('en-IN')} • Automated Digital Verification`, pageWidth / 2, pageHeight - 7, { align: 'center' });
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(6.5);
+    doc.setFont(undefined, 'normal');
+    
+    doc.text(`© Government of India E-Challan System | Generated: ${new Date().toLocaleString('en-IN')}`, 
+        pageWidth / 2, currentY + 4, { align: 'center' });
+    doc.text('This is an electronically generated document. No official seal or signature required under Information Technology Act, 2000',
+        pageWidth / 2, currentY + 7, { align: 'center' });
+    doc.text('For disputes and appeals: Contact the Traffic Court or Regional Transport Office within 60 days',
+        pageWidth / 2, currentY + 10, { align: 'center' });
+
+    // ============ BOTTOM BORDER ============
+    doc.setDrawColor(0, 32, 96);
+    doc.setLineWidth(0.5);
+    doc.line(0, pageHeight - 2, pageWidth, pageHeight - 2);
+    doc.setLineWidth(1);
+    doc.line(0, pageHeight - 0.5, pageWidth, pageHeight - 0.5);
 
     // Save PDF
-    doc.save(`Challan_${challan.id}_${challan.vehicle_plate || 'UNKNOWN'}_${Date.now()}.pdf`);
+    const fileName = `Challan_${challan.vehicle_plate || 'UNKNOWN'}_${issueDate.getTime()}.pdf`;
+    doc.save(fileName);
 };

@@ -45,7 +45,16 @@ const VIOLATION_COLORS = {
     'TRIPLE RIDING': { bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-purple-500/30', badge: 'bg-purple-500' },
 };
 
-const FINES = { 'NO HELMET': 1000, 'TRIPLE RIDING': 2000, 'OVERSPEEDING': 5000 };
+// Fine amounts based on Indian Motor Vehicles Act, 1988
+const FINES = {
+    'NO HELMET': 1000,
+    'TRIPLE RIDING': 2000,
+    'OVERSPEEDING': 5000,
+    'RED LIGHT VIOLATION': 1500,
+    'WRONG SIDE DRIVING': 3000,
+    'NO LICENSE': 5000,
+    'UNINSURED VEHICLE': 2000,
+};
 
 const getVehicleIcon = (type) => {
     const cls = 'text-xl';

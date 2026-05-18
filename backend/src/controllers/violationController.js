@@ -5,29 +5,50 @@ const path = require('path');
 
 // 1. Record Violation (Called by AI Service)
 exports.recordViolation = async (req, res) => {
-    const { video_id, violation_type, timestamp, confidence, speed, vehicle_number, evidence_image, vehicle_type } = req.body;
+    const { video_id, violation_type, timestamp, confidence, speed, vehicle_number, evidence_image, vehicle_type, location } = req.body;
+
+    // Validate required fields
+    if (!violation_type || !video_id) {
+        return res.status(400).json({ error: 'Missing required fields: violation_type, video_id' });
+    }
 
     try {
         const query = `
-            INSERT INTO violations (video_id, violation_type, timestamp, confidence_score, speed_kmph, vehicle_plate, evidence_image_path, vehicle_type, status)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING')
+            INSERT INTO violations (video_id, violation_type, timestamp, confidence_score, speed_kmph, vehicle_plate, evidence_image_path, vehicle_type, location, status)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'PENDING')
             RETURNING *;
         `;
-        const values = [video_id, violation_type, timestamp, confidence, speed, vehicle_number, evidence_image, vehicle_type];
+        const finalTimestamp = timestamp || new Date().toISOString();
+        const values = [
+            video_id, 
+            violation_type, 
+            finalTimestamp, 
+            confidence || 0.0, 
+            speed || 0, 
+            vehicle_number || null, 
+            evidence_image || null, 
+            vehicle_type || 'UNKNOWN',
+            location || 'Unknown Location'
+        ];
         const result = await pool.query(query, values);
 
-        console.log(`Violation Recorded: ${result.rows[0].id}`);
+        console.log(`✓ Violation Recorded: ID=${result.rows[0].id}, Type=${violation_type}, Vehicle=${vehicle_number}`);
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error('Database Insert Error:', err);
-        res.status(500).json({ error: 'Database error' });
+        res.status(500).json({ error: 'Database error', details: err.message });
     }
 };
 
 // 2. List All Violations (Admin)
 exports.getViolations = async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM violations ORDER BY created_at DESC');
+        const query = `
+            SELECT * FROM violations 
+            WHERE status != 'DELETED'
+            ORDER BY created_at DESC
+        `;
+        const result = await pool.query(query);
         res.json(result.rows);
     } catch (err) {
         res.status(500).json({ error: err.message });

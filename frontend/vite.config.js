@@ -9,19 +9,31 @@ export default defineConfig({
     cors: true,
   },
   build: {
+    target: 'esnext',
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
+      }
+    },
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('three') || id.includes('@react-three')) {
-              return 'vendor';
-            }
-            if (id.includes('gsap')) {
-              return 'gsap';
-            }
-          }
-        }
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-three': ['three', '@react-three/fiber', '@react-three/drei'],
+          'vendor-gsap': ['gsap'],
+          'vendor-ui': ['framer-motion', 'react-icons', 'chart.js', 'react-chartjs-2']
+        },
+        chunkFileNames: 'chunks/[name]-[hash].js',
+        entryFileNames: '[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]'
       }
-    }
+    },
+    chunkSizeWarningLimit: 1000,
+    reportCompressedSize: false
+  },
+  define: {
+    __DEV__: JSON.stringify(false)
   }
 })

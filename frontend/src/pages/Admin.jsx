@@ -233,7 +233,7 @@ const Admin = () => {
             // Try backend first
             if (!isDemo) {
                 try {
-                    const res = await fetch(`${API_CONFIG.ENDPOINTS.VIOLATIONS}/${violation.id}`, {
+                    const res = await fetch(`${API_CONFIG.ENDPOINTS.VIOLATIONS}/${violation.id}/challan`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' }
                     });
@@ -272,7 +272,7 @@ const Admin = () => {
                 // Update status via API
                 if (!isDemo) {
                     try {
-                        await fetch(`${API_CONFIG.ENDPOINTS.VIOLATIONS}/${violation.id}`, {
+                        await fetch(`${API_CONFIG.ENDPOINTS.VIOLATIONS}/${violation.id}/status`, {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ status: 'APPROVED', reviewed_by: 'admin' })

@@ -1,6 +1,7 @@
 {
     "version": 2,
-    "buildCommand": "npm install",
+    "buildCommand": "npm install --legacy-peer-deps",
+    "installCommand": "npm install --legacy-peer-deps",
     "env": {
         "DATABASE_URL": "@database_url",
         "DB_HOST": "@db_host",
@@ -9,6 +10,7 @@
         "DB_PASSWORD": "@db_password",
         "DB_NAME": "@db_name",
         "AI_SERVICE_URL": "@ai_service_url",
+        "CORS_ORIGIN": "@cors_origin",
         "NODE_ENV": "production"
     },
     "functions": {
@@ -33,6 +35,10 @@
                 {
                     "key": "Access-Control-Allow-Headers",
                     "value": "Content-Type, Authorization"
+                },
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=0, must-revalidate"
                 }
             ]
         }

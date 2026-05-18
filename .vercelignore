@@ -1,0 +1,77 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+DOCUMENTATION_INDEX.md
+README_DEPLOYMENT.md
+QUICK_START_GUIDE.md
+LOCAL_DEVELOPMENT_GUIDE.md
+TESTING_GUIDE.md
+USER_GUIDE.md
+
+# Development files
+.env.example
+.env.local
+.env.*.local
+nodemon.json
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+
+# AI Service (except what's needed for production)
+ai_service/uploads/
+ai_service/models/
+ai_service/processed/
+
+# Testing
+test_*.py
+*.test.js
+*.spec.js
+coverage/
+
+# Misc
+.env
+docker-compose.yml
+Dockerfile
+deploy.ps1
+deploy.sh
+start_all.sh
+quick-start.sh
+quick-start.ps1
+quick-start.bat
+START_ALL_SERVICES.bat
+STOP_ALL_SERVICES.bat

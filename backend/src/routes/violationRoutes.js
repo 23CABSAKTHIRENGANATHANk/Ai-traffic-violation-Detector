@@ -12,6 +12,10 @@ router.post('/upload', uploadController.uploadVideo);
 // Record violation from AI service
 router.post('/internal/record', validateViolation, violationController.recordViolation);
 
+// =============== Bulk Operations (MUST come before /:id routes) ===============
+router.patch('/bulk/approve', violationController.bulkApproveViolations);
+router.patch('/bulk/reject', violationController.bulkRejectViolations);
+
 // =============== Admin Routes ===============
 // Get all violations with filters
 router.get('/', validateQueryParams(), violationController.getViolations);
@@ -33,9 +37,5 @@ router.patch('/:id/status', violationController.updateViolationStatus);
 
 // Delete violation
 router.delete('/:id', violationController.deleteViolation);
-
-// Bulk operations
-router.patch('/bulk/approve', violationController.bulkApproveViolations);
-router.patch('/bulk/reject', violationController.bulkRejectViolations);
 
 module.exports = router;

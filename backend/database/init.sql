@@ -16,19 +16,20 @@ CREATE TABLE IF NOT EXISTS vehicles (
 CREATE TABLE IF NOT EXISTS violations (
     id SERIAL PRIMARY KEY,
     video_id VARCHAR(100),
-    vehicle_plate VARCHAR(20), -- Can be NULL if not recognized yet
-    violation_type VARCHAR(50) NOT NULL, -- 'NO_HELMET', 'TRIPLE_RIDING', 'OVERSPEEDING'
+    vehicle_plate VARCHAR(20),
+    violation_type VARCHAR(50) NOT NULL,
     timestamp TIMESTAMP NOT NULL,
-    location VARCHAR(100),
+    location VARCHAR(255),
     confidence_score FLOAT,
     speed_kmph FLOAT,
     evidence_image_path VARCHAR(255),
-    vehicle_type VARCHAR(50) DEFAULT 'UNKNOWN', -- 'CAR', 'MOTORCYCLE', 'TRUCK', 'BUS'
-    status VARCHAR(20) DEFAULT 'PENDING', -- 'PENDING', 'APPROVED', 'REJECTED'
+    vehicle_type VARCHAR(50) DEFAULT 'UNKNOWN',
+    status VARCHAR(20) DEFAULT 'PENDING',
     reviewed_by VARCHAR(100),
     reviewed_at TIMESTAMP,
     notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create indexes for better performance

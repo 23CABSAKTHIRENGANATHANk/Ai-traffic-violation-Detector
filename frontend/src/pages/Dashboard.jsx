@@ -75,10 +75,13 @@ const Dashboard = () => {
             setIsDemo(false);
         } catch {
             const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
+            const isCleared = localStorage.getItem('traffic_violations_cleared') === 'true';
             const merged = [...localViolations];
-            MOCK_VIOLATIONS.forEach(v => {
-                if (!merged.find(m => m.id === v.id)) merged.push(v);
-            });
+            if (!isCleared) {
+                MOCK_VIOLATIONS.forEach(v => {
+                    if (!merged.find(m => m.id === v.id)) merged.push(v);
+                });
+            }
             const normalized = merged.map(v => normalizeViolation(v));
             computeStats(normalized.sort((a, b) => new Date(b.created_at || b.timestamp) - new Date(a.created_at || a.timestamp)));
             setIsDemo(true);

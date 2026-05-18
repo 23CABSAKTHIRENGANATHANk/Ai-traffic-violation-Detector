@@ -195,7 +195,8 @@ const Admin = () => {
                 if (!merged.find(m => m.id === v.id)) merged.push(v);
             });
 
-            if (merged.length === 0) {
+            const isCleared = localStorage.getItem('traffic_violations_cleared') === 'true';
+            if (merged.length === 0 && !isCleared) {
                 MOCK_VIOLATIONS.forEach(mock => {
                     if (!merged.find(m => m.id === mock.id)) merged.push(mock);
                 });
@@ -220,8 +221,8 @@ const Admin = () => {
             setCurrentPage(1);
         } catch (err) {
             console.warn('API unreachable, using fallback:', err.message);
-            const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
-            const merged = [...localViolations, ...MOCK_VIOLATIONS];
+            const isCleared = localStorage.getItem('traffic_violations_cleared') === 'true';
+            const merged = isCleared ? localViolations : [...localViolations, ...MOCK_VIOLATIONS];
             const normalized = merged.map(v => normalizeViolation(v));
             
             // Automatic local storage self-healing/migration logic
@@ -676,7 +677,18 @@ const Admin = () => {
                     <div className="flex flex-col items-center justify-center py-20 text-gray-500">
                         <FaShieldAlt className="text-4xl mb-3 opacity-30" />
                         <p className="text-lg font-semibold">No violations found</p>
-                        <p className="text-sm mt-1">Adjust filters or check back soon</p>
+                        <p className="text-sm mt-1 mb-5">Adjust filters or check back soon</p>
+                        {localStorage.getItem('traffic_violations_cleared') === 'true' && (
+                            <button
+                                onClick={() => {
+                                    localStorage.removeItem('traffic_violations_cleared');
+                                    window.location.reload();
+                                }}
+                                className="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white rounded-lg text-sm font-semibold transition-all shadow-[0_0_15px_rgba(0,243,255,0.25)] flex items-center gap-2 border border-cyan-500/30"
+                            >
+                                Populate Sample Violation Records
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <>

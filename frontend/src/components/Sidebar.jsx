@@ -48,6 +48,7 @@ const Sidebar = () => {
 
             <button 
                 onClick={() => {
+                    localStorage.setItem('traffic_violations_cleared', 'true');
                     localStorage.removeItem('traffic_violations');
                     navigate('/');
                 }}

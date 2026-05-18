@@ -142,13 +142,16 @@ const Analytics = () => {
             console.warn('API unreachable, fallback to client-side dynamic analytics aggregation:', err.message);
             
             const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
+            const isCleared = localStorage.getItem('traffic_violations_cleared') === 'true';
             const mergedViolations = [...localViolations];
             
-            MOCK_VIOLATIONS.forEach(v => {
-                if (!mergedViolations.find(m => m.id === v.id)) {
-                    mergedViolations.push(v);
-                }
-            });
+            if (!isCleared) {
+                MOCK_VIOLATIONS.forEach(v => {
+                    if (!mergedViolations.find(m => m.id === v.id)) {
+                        mergedViolations.push(v);
+                    }
+                });
+            }
 
             const computed = calculateClientSideAnalytics(mergedViolations);
             setAnalytics(computed);

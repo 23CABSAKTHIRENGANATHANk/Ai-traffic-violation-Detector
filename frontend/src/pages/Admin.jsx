@@ -57,6 +57,31 @@ const getVehicleIcon = (type) => {
     }
 };
 
+const normalizeViolation = (v) => {
+    const violation_type = v.violation_type || v.type || 'OVERSPEEDING';
+    const confidence_score = v.confidence_score !== undefined ? v.confidence_score : (v.confidence !== undefined ? v.confidence : 0.90);
+    const speed_kmph = v.speed_kmph !== undefined ? v.speed_kmph : (v.speed !== undefined ? v.speed : 0);
+    
+    let vehicle_type = v.vehicle_type || v.vehicle || 'CAR';
+    if (!v.vehicle_type && !v.vehicle) {
+        if (violation_type === 'NO HELMET' || violation_type === 'TRIPLE RIDING') {
+            vehicle_type = 'MOTORCYCLE';
+        }
+    }
+
+    return {
+        ...v,
+        violation_type,
+        confidence_score,
+        speed_kmph,
+        vehicle_type,
+        vehicle_plate: v.vehicle_plate || '—',
+        status: v.status || 'PENDING',
+        created_at: v.created_at || v.timestamp || new Date().toISOString(),
+        location: v.location || 'N/A'
+    };
+};
+
 // ────────────────────────────────────────────────────────────────────────────
 // COMPONENTS
 // ────────────────────────────────────────────────────────────────────────────
@@ -116,6 +141,12 @@ const Admin = () => {
     const [currentPage, setCurrentPage]      = useState(1);
     const itemsPerPage = 10;
 
+    const updateViolationsState = (newViolations) => {
+        setViolations(newViolations);
+        const localOnly = newViolations.filter(v => v.id !== 1 && v.id !== 2 && v.id !== 3);
+        localStorage.setItem('traffic_violations', JSON.stringify(localOnly));
+    };
+
     // Utilities
     const showNotification = (msg, type = 'success') => {
         setNotification({ msg, type });
@@ -161,7 +192,9 @@ const Admin = () => {
                 });
             }
 
-            const sorted = merged.sort((a, b) => {
+            const normalized = merged.map(v => normalizeViolation(v));
+
+            const sorted = normalized.sort((a, b) => {
                 const aVal = a[sortBy] || 0;
                 const bVal = b[sortBy] || 0;
                 if (sortOrder === 'DESC') return bVal > aVal ? 1 : -1;
@@ -176,7 +209,8 @@ const Admin = () => {
             console.warn('API unreachable, using fallback:', err.message);
             const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
             const merged = [...localViolations, ...MOCK_VIOLATIONS];
-            setViolations(merged);
+            const normalized = merged.map(v => normalizeViolation(v));
+            setViolations(normalized);
             setIsDemo(true);
             setLastRefresh(new Date());
         } finally {
@@ -218,7 +252,8 @@ const Admin = () => {
                             window.URL.revokeObjectURL(url);
 
                             // Update local state
-                            setViolations(v => v.map(x => x.id === violation.id ? { ...x, status: 'APPROVED' } : x));
+                            const updated = violations.map(x => x.id === violation.id ? { ...x, status: 'APPROVED' } : x);
+                            updateViolationsState(updated);
                             showNotification(`✓ Challan generated for ${violation.vehicle_plate}`, 'success');
                             setActionLoading(null);
                             return;
@@ -248,7 +283,8 @@ const Admin = () => {
                 }
 
                 // Update local state
-                setViolations(v => v.map(x => x.id === violation.id ? { ...x, status: 'APPROVED' } : x));
+                const updated = violations.map(x => x.id === violation.id ? { ...x, status: 'APPROVED' } : x);
+                updateViolationsState(updated);
                 showNotification(`✓ Challan PDF generated for ${violation.vehicle_plate}`, 'success');
             } catch (err) {
                 console.error('PDF generation failed:', err);
@@ -303,7 +339,8 @@ const Admin = () => {
                 if (!res.ok) throw new Error('Failed to delete');
             }
 
-            setViolations(v => v.filter(x => x.id !== id));
+            const updated = violations.filter(x => x.id !== id);
+            updateViolationsState(updated);
             setSelectedViolations(s => new Set([...s].filter(x => x !== id)));
             showNotification('✓ Violation deleted', 'success');
         } catch (err) {

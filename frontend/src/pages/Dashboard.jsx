@@ -26,6 +26,31 @@ const VIOLATION_DOT = {
     'TRIPLE RIDING': 'bg-purple-400',
 };
 
+const normalizeViolation = (v) => {
+    const violation_type = v.violation_type || v.type || 'OVERSPEEDING';
+    const confidence_score = v.confidence_score !== undefined ? v.confidence_score : (v.confidence !== undefined ? v.confidence : 0.90);
+    const speed_kmph = v.speed_kmph !== undefined ? v.speed_kmph : (v.speed !== undefined ? v.speed : 0);
+    
+    let vehicle_type = v.vehicle_type || v.vehicle || 'CAR';
+    if (!v.vehicle_type && !v.vehicle) {
+        if (violation_type === 'NO HELMET' || violation_type === 'TRIPLE RIDING') {
+            vehicle_type = 'MOTORCYCLE';
+        }
+    }
+
+    return {
+        ...v,
+        violation_type,
+        confidence_score,
+        speed_kmph,
+        vehicle_type,
+        vehicle_plate: v.vehicle_plate || '—',
+        status: v.status || 'PENDING',
+        created_at: v.created_at || v.timestamp || new Date().toISOString(),
+        location: v.location || 'N/A'
+    };
+};
+
 const Dashboard = () => {
     const [stats, setStats] = useState({ total: 0, pending: 0, revenue: 0, recent: [] });
     const [isDemo, setIsDemo] = useState(false);
@@ -45,7 +70,8 @@ const Dashboard = () => {
                 if (!merged.find(m => m.id === v.id)) merged.push(v);
             });
             
-            computeStats(merged.sort((a, b) => new Date(b.created_at || b.timestamp) - new Date(a.created_at || a.timestamp)));
+            const normalized = merged.map(v => normalizeViolation(v));
+            computeStats(normalized.sort((a, b) => new Date(b.created_at || b.timestamp) - new Date(a.created_at || a.timestamp)));
             setIsDemo(false);
         } catch {
             const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
@@ -53,7 +79,8 @@ const Dashboard = () => {
             MOCK_VIOLATIONS.forEach(v => {
                 if (!merged.find(m => m.id === v.id)) merged.push(v);
             });
-            computeStats(merged.sort((a, b) => new Date(b.created_at || b.timestamp) - new Date(a.created_at || a.timestamp)));
+            const normalized = merged.map(v => normalizeViolation(v));
+            computeStats(normalized.sort((a, b) => new Date(b.created_at || b.timestamp) - new Date(a.created_at || a.timestamp)));
             setIsDemo(true);
         } finally {
             setLoading(false);

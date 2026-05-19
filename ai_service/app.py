@@ -37,6 +37,14 @@ MODELS_DIR = os.path.join(BASE_DIR, "models")
 # Using localhost for this local running setup
 BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://localhost:3000/api/violations/internal/record")
 
+# Detection / violation configuration
+YOLO_CONFIDENCE = float(os.getenv("YOLO_CONFIDENCE", "0.35"))
+YOLO_IOU = float(os.getenv("YOLO_IOU", "0.45"))
+SPEED_LIMIT_KMPH = float(os.getenv("SPEED_LIMIT_KMPH", "60"))
+PIXEL_SCALE_DEFAULT = float(os.getenv("PIXEL_SCALE", "0.05"))
+TRACK_EXPIRE_FRAMES = int(os.getenv("TRACK_EXPIRE_FRAMES", "20"))
+MAX_TRACK_DISTANCE = int(os.getenv("MAX_TRACK_DISTANCE", "80"))
+
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(PROCESSED_DIR, exist_ok=True)
 os.makedirs(MODELS_DIR, exist_ok=True)
@@ -72,7 +80,7 @@ def euclidean_distance(a, b):
     return math.hypot(a[0] - b[0], a[1] - b[1])
 
 
-def find_matching_track(center, cls, track_history, max_distance=80):
+def find_matching_track(center, cls, track_history, max_distance=MAX_TRACK_DISTANCE):
     best_id = None
     best_dist = float('inf')
     for tid, info in track_history.items():
@@ -95,18 +103,24 @@ def cleanup_stale_tracks(track_history, current_frame):
 def health_check():
     return {"status": "healthy", "service": "AI Traffic Violation Detector", "ready": vehicle_model is not None}
 
-def calculate_speed(prev_pos, curr_pos, fps, pixel_scale=0.05):
-    if prev_pos is None: return 0
+def calculate_speed(prev_pos, curr_pos, fps, pixel_scale=PIXEL_SCALE_DEFAULT):
+    if prev_pos is None or fps <= 0:
+        return 0.0
+
     dx = curr_pos[0] - prev_pos[0]
     dy = curr_pos[1] - prev_pos[1]
-    pixel_dist = math.sqrt(dx**2 + dy**2)
-    
-    # NOISE GATE: Ignore jitter for stationary vehicles (Parked Car Fix)
-    if pixel_dist < 5: 
-        return 0
-        
+    pixel_dist = math.hypot(dx, dy)
+
+    # NOISE GATE: Ignore jitter for stationary / parked vehicles
+    if pixel_dist < 5:
+        return 0.0
+
+    # Cap unrealistic displacements caused by detection jitter
+    pixel_dist = min(pixel_dist, 300)
+
     speed_ms = (pixel_dist * pixel_scale) * fps
-    return round(speed_ms * 3.6, 2)
+    speed_kmph = speed_ms * 3.6
+    return round(speed_kmph, 2)
 
 def check_triple_riding(motorcycle_box, persons_boxes):
     """
@@ -114,38 +128,37 @@ def check_triple_riding(motorcycle_box, persons_boxes):
     """
     mx1, my1, mx2, my2 = motorcycle_box
     count = 0
-    motorcycle_area = (mx2 - mx1) * (my2 - my1)
-    
+
     for px1, py1, px2, py2 in persons_boxes:
         # Calculate intersection
         ix1 = max(mx1, px1)
         iy1 = max(my1, py1)
         ix2 = min(mx2, px2)
         iy2 = min(my2, py2)
-        
+
         if ix1 < ix2 and iy1 < iy2:
             intersection_area = (ix2 - ix1) * (iy2 - iy1)
-            person_area = (px2 - px1) * (py2 - py1)
-            
+            person_area = max((px2 - px1) * (py2 - py1), 1)
+
             # If significant overlap (e.g. > 50% of person is inside bike box)
             if intersection_area > 0.5 * person_area:
                 count += 1
-                
-    return count > 2, count
+
+    # Triple riding only when 3 or more riders are clearly visible.
+    return count >= 3, count
 
 def check_no_helmet(frame, motorcycle_box, persons_boxes, track_id):
     """
     Improved No Helmet Detection.
 
     LOGIC:
-    - If rider detected overlapping with motorcycle → analyze rider head region
-    - Use simple visual heuristics to avoid flagging every motorcycle as no-helmet
-    - Placeholder for a future helmet classifier model
+    - Only analyze riders clearly overlapping with the motorcycle.
+    - If any rider head region shows helmet-like visual cues, do not flag NO HELMET.
+    - Otherwise return no-helmet with a confidence score.
 
     Returns: (is_no_helmet_detected, confidence_score)
     """
     mx1, my1, mx2, my2 = motorcycle_box
-    rider_count = 0
     rider_head_regions = []
 
     for px1, py1, px2, py2 in persons_boxes:
@@ -156,36 +169,41 @@ def check_no_helmet(frame, motorcycle_box, persons_boxes, track_id):
 
         if ix1 < ix2 and iy1 < iy2:
             intersection_area = (ix2 - ix1) * (iy2 - iy1)
-            person_area = (px2 - px1) * (py2 - py1)
-            if person_area > 0 and intersection_area > 0.4 * person_area:
-                rider_count += 1
+            person_area = max((px2 - px1) * (py2 - py1), 1)
+            if intersection_area > 0.35 * person_area:
                 person_height = py2 - py1
                 head_top = py1
-                head_bottom = py1 + int(person_height * 0.35)
-                rider_head_regions.append((px1, head_top, px2, head_bottom))
+                head_bottom = py1 + int(person_height * 0.30)
+                rider_head_regions.append((max(0, px1), max(0, head_top), min(frame.shape[1], px2), min(frame.shape[0], head_bottom)))
 
-    if rider_count == 0:
+    if len(rider_head_regions) == 0:
         return False, 0.0
 
-    helmet_like_signals = 0
+    helmet_signals = 0
+    valid_regions = 0
     for hx1, hy1, hx2, hy2 in rider_head_regions:
-        head_crop = frame[hy1:hy2, hx1:hx2] if (hy2 > hy1 and hx2 > hx1) else None
+        head_crop = frame[hy1:hy2, hx1:hx2]
         if head_crop is None or head_crop.size == 0:
             continue
 
+        valid_regions += 1
         gray = cv2.cvtColor(head_crop, cv2.COLOR_BGR2GRAY)
-        blur = cv2.GaussianBlur(gray, (7, 7), 0)
-        edges = cv2.Canny(blur, 45, 100)
+        blur = cv2.GaussianBlur(gray, (5, 5), 0)
+        edges = cv2.Canny(blur, 50, 120)
         edge_density = np.sum(edges > 0) / (head_crop.shape[0] * head_crop.shape[1] + 1)
         mean_intensity = np.mean(gray) / 255.0
 
-        if edge_density > 0.015 and mean_intensity > 0.25:
-            helmet_like_signals += 1
+        # Helmet top region usually has stronger edge structure and moderate brightness
+        if edge_density > 0.02 and 0.18 < mean_intensity < 0.85:
+            helmet_signals += 1
 
-    if helmet_like_signals >= rider_count:
-        return False, 0.9
+    if valid_regions == 0:
+        return False, 0.0
 
-    confidence = 0.70 if rider_count == 1 else 0.85
+    if helmet_signals >= 1:
+        return False, min(0.95, 0.5 + 0.15 * valid_regions)
+
+    confidence = min(0.95, 0.55 + 0.15 * valid_regions)
     return True, confidence
 
 def report_async(video_id, v_type, track_id, frame_copy, speed, plate_text, vehicle_type, timestamp, confidence):
@@ -282,7 +300,14 @@ def generate_frames(video_path: str, video_id: str):
             frame = cv2.resize(frame, (640, int(height * scale)))
         
         # Use detection with simple centroid-based track matching
-        results = vehicle_model.predict(frame, classes=[0, 2, 3, 5, 7], verbose=False, imgsz=640)
+        results = vehicle_model.predict(
+            frame,
+            classes=[0, 2, 3, 5, 7],
+            conf=YOLO_CONFIDENCE,
+            iou=YOLO_IOU,
+            verbose=False,
+            imgsz=640
+        )
         
         annotated_frame = frame.copy()
         
@@ -348,7 +373,8 @@ def generate_frames(video_path: str, video_id: str):
                 # We processed 1 frame out of SKIP_STEP.
                 # So time delta is SKIP_STEP * (1/fps).
                 effective_fps = fps / SKIP_STEP
-                raw_speed = calculate_speed(prev_pos, center, effective_fps)
+                pixel_scale = PIXEL_SCALE_DEFAULT * (640.0 / max(width, 640))
+                raw_speed = calculate_speed(prev_pos, center, effective_fps, pixel_scale=pixel_scale)
                 
                 track_data['speed_buffer'].append(raw_speed)
                 if len(track_data['speed_buffer']) > 5:
@@ -361,13 +387,12 @@ def generate_frames(video_path: str, video_id: str):
                 detected_violations = []
 
                 # Violations
-                # THRESHOLD: Updated to 60 km/h as requested
-                limit = 60 
+                limit = SPEED_LIMIT_KMPH
                 
-                # 1. OVERSPEEDING (Strictly Cars, Buses, Trucks ONLY)
-                if cls in [2, 5, 7] and speed > limit:
-                     detected_violations.append("OVERSPEEDING")
-                     print(f"DEBUG: OVERSPEEDING {track_id} Speed {speed}")
+                # 1. OVERSPEEDING (All detected vehicle types)
+                if cls in [2, 3, 5, 7] and speed > limit:
+                    detected_violations.append("OVERSPEEDING")
+                    print(f"DEBUG: OVERSPEEDING {track_id} Speed {speed}")
 
                 # 2. TRIPLE RIDING (Motorcycles Only)
                 if cls == MOTORCYCLE_CLASS:

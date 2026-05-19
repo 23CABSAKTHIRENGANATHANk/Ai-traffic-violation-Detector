@@ -222,37 +222,42 @@ class MockDB {
     }
 }
 
-// Try to use real PostgreSQL, fallback to MockDB
-let pool;
-try {
-    if (process.env.DATABASE_URL || (process.env.DB_HOST && process.env.DB_USER && process.env.DB_PASSWORD && process.env.DB_NAME)) {
-        pool = new Pool({
-            connectionString: process.env.DATABASE_URL,
-            host: process.env.DB_HOST,
-            port: process.env.DB_PORT || 5432,
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            database: process.env.DB_NAME
-        });
-        
-        pool.on('error', (err) => {
-            console.warn('❌ PostgreSQL connection error, falling back to MockDB:', err.message);
-            pool = new MockDB();
-        });
-        
-        // Test connection
-        pool.query('SELECT NOW();').then(() => {
+let activeDb = new MockDB();
+
+const hasDatabaseCredentials = Boolean(
+    process.env.DATABASE_URL ||
+    (process.env.DB_HOST && process.env.DB_USER && process.env.DB_PASSWORD && process.env.DB_NAME)
+);
+
+if (hasDatabaseCredentials) {
+    const pgPool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        host: process.env.DB_HOST,
+        port: process.env.DB_PORT || 5432,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME
+    });
+
+    pgPool.on('error', (err) => {
+        console.warn('❌ PostgreSQL connection error, continuing with MockDB:', err.message);
+        activeDb = new MockDB();
+    });
+
+    pgPool.connect()
+        .then((client) => {
+            client.release();
+            activeDb = pgPool;
             console.log('✅ Connected to PostgreSQL');
-        }).catch(() => {
-            console.warn('❌ PostgreSQL unavailable, using MockDB');
-            pool = new MockDB();
+        })
+        .catch((err) => {
+            console.warn('❌ PostgreSQL unavailable, continuing with MockDB:', err.message);
+            activeDb = new MockDB();
         });
-    } else {
-        throw new Error('Database credentials not provided');
-    }
-} catch (err) {
-    console.log('📝 Using MockDB (development mode)');
-    pool = new MockDB();
 }
 
-module.exports = pool;
+module.exports = {
+    query: async (text, params = []) => {
+        return activeDb.query(text, params);
+    }
+};

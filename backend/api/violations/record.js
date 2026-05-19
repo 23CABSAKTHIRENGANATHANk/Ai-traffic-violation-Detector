@@ -29,7 +29,8 @@ export default async function handler(req, res) {
         const vehicle_plate = req.body.vehicle_plate || req.body.vehicle_number || 'UNKNOWN';
         const evidence_image_path = req.body.evidence_image_path || req.body.evidence_image || null;
         const vehicle_type = req.body.vehicle_type || 'UNKNOWN';
-        const speed_kmph = speed || req.body.speed_kmph || 0;
+        const speed_kmph = speed != null ? speed : req.body.speed_kmph || 0;
+        const confidence_score = confidence != null ? confidence : 0.95;
 
         // Validation
         if (!video_id || !violation_type || !timestamp) {
@@ -42,7 +43,7 @@ export default async function handler(req, res) {
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING')
                 RETURNING *;
             `;
-            const values = [video_id, violation_type, timestamp, confidence || 0.95, speed_kmph, vehicle_plate, evidence_image_path, vehicle_type];
+            const values = [video_id, violation_type, timestamp, confidence_score, speed_kmph, vehicle_plate, evidence_image_path, vehicle_type];
             const result = await pool.query(query, values);
 
             console.log(`✓ Violation Recorded: ID ${result.rows[0].id}, Type: ${violation_type}, Plate: ${vehicle_plate}`);

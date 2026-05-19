@@ -11,7 +11,7 @@ import requests
 import numpy as np
 import util  # Uses the updated util.py with Indian plate support
 from ultralytics import YOLO
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 import threading
 
@@ -64,6 +64,32 @@ def load_model():
 VEHICLE_CLASSES = [2, 3, 5, 7]
 PERSON_CLASS = 0
 MOTORCYCLE_CLASS = 3
+TRACK_EXPIRE_FRAMES = 20
+next_track_id = 1
+
+
+def euclidean_distance(a, b):
+    return math.hypot(a[0] - b[0], a[1] - b[1])
+
+
+def find_matching_track(center, cls, track_history, max_distance=80):
+    best_id = None
+    best_dist = float('inf')
+    for tid, info in track_history.items():
+        if info['class'] != cls:
+            continue
+        dist = euclidean_distance(center, info['last_pos'])
+        if dist < best_dist and dist < max_distance:
+            best_dist = dist
+            best_id = tid
+    return best_id
+
+
+def cleanup_stale_tracks(track_history, current_frame):
+    stale_ids = [tid for tid, info in track_history.items() if current_frame - info['last_seen'] > TRACK_EXPIRE_FRAMES]
+    for tid in stale_ids:
+        del track_history[tid]
+
 
 @app.get("/")
 def health_check():
@@ -107,67 +133,62 @@ def check_triple_riding(motorcycle_box, persons_boxes):
                 
     return count > 2, count
 
-def check_no_helmet(motorcycle_box, persons_boxes, track_id):
+def check_no_helmet(frame, motorcycle_box, persons_boxes, track_id):
     """
     Improved No Helmet Detection.
-    
+
     LOGIC:
-    - If rider detected overlapping with motorcycle → Check if helmet-like appearance in head region
-    - For now, uses heuristic but structured to integrate helmet classifier later
-    
+    - If rider detected overlapping with motorcycle → analyze rider head region
+    - Use simple visual heuristics to avoid flagging every motorcycle as no-helmet
+    - Placeholder for a future helmet classifier model
+
     Returns: (is_no_helmet_detected, confidence_score)
     """
     mx1, my1, mx2, my2 = motorcycle_box
-    bike_height = my2 - my1
-    bike_width = mx2 - mx1
-    
     rider_count = 0
     rider_head_regions = []
-    
+
     for px1, py1, px2, py2 in persons_boxes:
-        # Calculate overlap with motorcycle
         ix1 = max(mx1, px1)
         iy1 = max(my1, py1)
         ix2 = min(mx2, px2)
         iy2 = min(my2, py2)
-        
+
         if ix1 < ix2 and iy1 < iy2:
             intersection_area = (ix2 - ix1) * (iy2 - iy1)
             person_area = (px2 - px1) * (py2 - py1)
-            
-            # If significant overlap (rider confirmed)
-            if intersection_area > 0.5 * person_area:
+            if person_area > 0 and intersection_area > 0.4 * person_area:
                 rider_count += 1
-                # Store head region (upper 30% of person bbox)
                 person_height = py2 - py1
                 head_top = py1
                 head_bottom = py1 + int(person_height * 0.35)
                 rider_head_regions.append((px1, head_top, px2, head_bottom))
-    
-    # If no riders, no helmet violation
-    if rider_count == 0:
-        return False
-    
-    # IMPROVED: Check for helmet-like structures in head region
-    # This is a placeholder for a proper helmet classifier model
-    # In production, run a helmet detection model on head_regions
-    
-    # For now: Heuristic based on frame characteristics
-    # If motorcyle detected with riders, flag as potential no-helmet
-    # Confidence increases with more riders without apparent head protection
-    
-    # Deterministic but not flagging EVERY bike:
-    # Only flag if 1-2 riders detected (typical no-helmet cases)
-    # Triple riding case is handled separately
-    
-    if rider_count == 1 or rider_count == 2:
-        # Single or double rider - check if appears to be without helmet
-        # Using simple heuristic: darker head region often indicates no helmet
-        return True, 0.75
-    
-    return False, 0.0
 
-def report_async(video_id, v_type, track_id, frame_copy, speed, plate_text, vehicle_type):
+    if rider_count == 0:
+        return False, 0.0
+
+    helmet_like_signals = 0
+    for hx1, hy1, hx2, hy2 in rider_head_regions:
+        head_crop = frame[hy1:hy2, hx1:hx2] if (hy2 > hy1 and hx2 > hx1) else None
+        if head_crop is None or head_crop.size == 0:
+            continue
+
+        gray = cv2.cvtColor(head_crop, cv2.COLOR_BGR2GRAY)
+        blur = cv2.GaussianBlur(gray, (7, 7), 0)
+        edges = cv2.Canny(blur, 45, 100)
+        edge_density = np.sum(edges > 0) / (head_crop.shape[0] * head_crop.shape[1] + 1)
+        mean_intensity = np.mean(gray) / 255.0
+
+        if edge_density > 0.015 and mean_intensity > 0.25:
+            helmet_like_signals += 1
+
+    if helmet_like_signals >= rider_count:
+        return False, 0.9
+
+    confidence = 0.70 if rider_count == 1 else 0.85
+    return True, confidence
+
+def report_async(video_id, v_type, track_id, frame_copy, speed, plate_text, vehicle_type, timestamp, confidence):
     """
     Async reporter to avoid blocking video stream.
     """
@@ -184,8 +205,8 @@ def report_async(video_id, v_type, track_id, frame_copy, speed, plate_text, vehi
             "id": int(datetime.now().timestamp() * 1000) + random.randint(0, 1000),
             "video_id": video_id,
             "violation_type": v_type,
-            "timestamp": datetime.now().isoformat(),
-            "confidence": 0.95,
+            "timestamp": timestamp,
+            "confidence": confidence,
             "speed": speed,
             "vehicle_plate": final_number,
             "evidence_image_path": evidence_filename,
@@ -229,8 +250,9 @@ def generate_frames(video_path: str, video_id: str):
     fps = cap.get(cv2.CAP_PROP_FPS) or 30
     
     frame_count = 0
-    track_history = {} 
-    vehicle_plates = {} 
+    video_start = datetime.utcnow()
+    track_history = {}
+    vehicle_plates = {}
     
     print(f"[STREAM] Starting frame processing loop...")
     while True:
@@ -240,6 +262,7 @@ def generate_frames(video_path: str, video_id: str):
             break
         
         frame_count += 1
+        frame_time = (video_start + timedelta(seconds=(frame_count / fps))).isoformat()
         
         if frame_count == 1:
             print(f"[STREAM] ✓ First frame read successfully! Frame shape: {frame.shape}")
@@ -258,8 +281,7 @@ def generate_frames(video_path: str, video_id: str):
             scale = 640 / width
             frame = cv2.resize(frame, (640, int(height * scale)))
         
-        # Use simple detection instead of tracking (tracking requires 'lap' module)
-        # We'll generate simple IDs based on detection order
+        # Use detection with simple centroid-based track matching
         results = vehicle_model.predict(frame, classes=[0, 2, 3, 5, 7], verbose=False, imgsz=640)
         
         annotated_frame = frame.copy()
@@ -268,44 +290,71 @@ def generate_frames(video_path: str, video_id: str):
             boxes = results[0].boxes.xywh.cpu().tolist()
             cls_ids = results[0].boxes.cls.int().cpu().tolist()
             boxes_xyxy = results[0].boxes.xyxy.cpu().tolist()
-            
-            # Generate simple track IDs based on frame count and detection order
-            track_ids = [frame_count * 100 + i for i in range(len(boxes))]
-
+            scores = results[0].boxes.conf.cpu().tolist()
 
             persons = []
             vehicles = []
 
-            for box, box_xyxy_val, track_id, cls in zip(boxes, boxes_xyxy, track_ids, cls_ids):
+            for box, box_xyxy_val, score, cls in zip(boxes, boxes_xyxy, scores, cls_ids):
                 if int(cls) == 0:
                     persons.append(box_xyxy_val)
                 elif int(cls) in VEHICLE_CLASSES:
-                    vehicles.append((box, box_xyxy_val, track_id, int(cls)))
+                    vehicles.append((box, box_xyxy_val, float(score), int(cls)))
 
-            for box, box_xyxy, track_id, cls in vehicles:
+            reused_ids = set()
+            assigned_vehicles = []
+
+            for box, box_xyxy, confidence_score, cls in vehicles:
+                x, y, w, h = box
+                center = (float(x), float(y))
+                match_id = find_matching_track(center, cls, track_history)
+                
+                if match_id is None or match_id in reused_ids:
+                    global next_track_id
+                    match_id = next_track_id
+                    next_track_id += 1
+                    track_history[match_id] = {
+                        'last_pos': center,
+                        'class': cls,
+                        'last_seen': frame_count,
+                        'speed_buffer': [],
+                        'last_ocr_frame': -100
+                    }
+                else:
+                    track_history[match_id]['last_seen'] = frame_count
+                reused_ids.add(match_id)
+                assigned_vehicles.append((box, box_xyxy, match_id, cls, confidence_score))
+
+            cleanup_stale_tracks(track_history, frame_count)
+
+            for box, box_xyxy, track_id, cls, confidence_score in assigned_vehicles:
                 x, y, w, h = box
                 center = (float(x), float(y))
                 x1, y1, x2, y2 = map(int, box_xyxy)
                 
                 if track_id not in track_history:
-                    track_history[track_id] = {'last_pos': center, 'last_ocr_frame': -100, 'speed_buffer': []}
-                
-                prev_pos = track_history[track_id].get('last_pos')
+                    track_history[track_id] = {
+                        'last_pos': center,
+                        'class': cls,
+                        'last_seen': frame_count,
+                        'speed_buffer': [],
+                        'last_ocr_frame': -100
+                    }
+
+                track_data = track_history[track_id]
+                prev_pos = track_data.get('last_pos')
                 
                 # CORRECT SPEED CALCULATION for Skipped Frames
                 # We processed 1 frame out of SKIP_STEP.
                 # So time delta is SKIP_STEP * (1/fps).
-                # Effective FPS for speed calc is fps / SKIP_STEP.
                 effective_fps = fps / SKIP_STEP
                 raw_speed = calculate_speed(prev_pos, center, effective_fps)
                 
-                # Speed Smoothing (Moving Average)
-                track_history[track_id]['speed_buffer'].append(raw_speed)
-                if len(track_history[track_id]['speed_buffer']) > 5:
-                    track_history[track_id]['speed_buffer'].pop(0)
-                speed = round(sum(track_history[track_id]['speed_buffer']) / len(track_history[track_id]['speed_buffer']), 2)
-
-                track_history[track_id]['last_pos'] = center
+                track_data['speed_buffer'].append(raw_speed)
+                if len(track_data['speed_buffer']) > 5:
+                    track_data['speed_buffer'].pop(0)
+                speed = round(sum(track_data['speed_buffer']) / len(track_data['speed_buffer']), 2)
+                track_data['last_pos'] = center
                 
                 class_name = vehicle_model.names[int(cls)].upper()
                 
@@ -329,26 +378,26 @@ def generate_frames(video_path: str, video_id: str):
                 
                 # 3. NO HELMET (Motorcycles Only)
                 if cls == MOTORCYCLE_CLASS:
-                    # Heuristic: If rider detected, check valid helmet
-                    is_no_helmet, confidence = check_no_helmet(box_xyxy, persons, track_id)
+                    is_no_helmet, confidence = check_no_helmet(frame, box_xyxy, persons, track_id)
                     if is_no_helmet:
                          detected_violations.append("NO HELMET")
                          print(f"DEBUG: NO HELMET {track_id} (confidence: {confidence})")
 
                 # ANPR
                 cached_plate = vehicle_plates.get(track_id)
-                last_ocr = track_history[track_id]['last_ocr_frame']
+                last_ocr = track_data['last_ocr_frame']
                 
                 should_run_ocr = False
                 if not cached_plate:
-                    if frame_count - last_ocr > 5: should_run_ocr = True
+                    if frame_count - last_ocr > 5:
+                        should_run_ocr = True
                 elif cached_plate['score'] < 0.8:
-                    if frame_count - last_ocr > 10: should_run_ocr = True
+                    if frame_count - last_ocr > 10:
+                        should_run_ocr = True
 
                 if should_run_ocr:
                      v_h, v_w = frame.shape[:2]
                      
-                     # 1. Expand Crop slightly (5% margin) to ensure plate edges aren't cut
                      margin_x = int((x2 - x1) * 0.05)
                      margin_y = int((y2 - y1) * 0.05)
                      vx1 = max(0, x1 - margin_x)
@@ -358,20 +407,15 @@ def generate_frames(video_path: str, video_id: str):
                      
                      vehicle_h = vy2 - vy1
                      
-                     # SMART CROP: Focus on Bottom 40% of vehicle (Bumper area) for Cars/Trucks/Buses
-                     # For Motorcycles, plates can be higher, so we use Bottom 60%
-                     crop_ratio = 0.60 if int(cls) == 3 else 0.40 # 3 is Motorcycle
-                     
+                     crop_ratio = 0.60 if int(cls) == MOTORCYCLE_CLASS else 0.40
                      plate_zone_y1 = vy1 + int((1 - crop_ratio) * vehicle_h)
                      plate_zone_crop = frame[plate_zone_y1:vy2, vx1:vx2]
                      
                      if plate_zone_crop.size > 0:
-                        # Pass ONLY the bumper area to OCR
                         text, score = util.read_license_plate(plate_zone_crop)
-                        track_history[track_id]['last_ocr_frame'] = frame_count
+                        track_data['last_ocr_frame'] = frame_count
                         
                         if text and score:
-                            # 2. Persistence Logic: Only update if Better Score OR No current plate
                             current_data = vehicle_plates.get(track_id)
                             if not current_data or score > current_data['score']:
                                 print(f"DEBUG: Updated Plate {track_id}: {text} ({score:.2f})")
@@ -379,31 +423,23 @@ def generate_frames(video_path: str, video_id: str):
 
                 color = (0, 255, 0)
                 label_text = ""
-                plate_text = vehicle_plates[track_id]['text'] if track_id in vehicle_plates else ""
+                plate_text = vehicle_plates.get(track_id, {}).get('text', "")
                 
                 if detected_violations:
                     color = (0, 0, 255)
                     label_text = ", ".join(detected_violations)
-                    # Note: In streaming mode, we might not want to spam backend calls every frame.
-                    # Logic: only report once per violation type per track_id
-                    for v_type in detected_violations:
-                        violation_key = f'logged_{v_type}'
-
-
-
-# ... inside generate_frames ...
-
+                    # Note: In streaming mode, report each violation only once for the same tracked vehicle.
                     for v_type in detected_violations:
                         violation_key = f'logged_{v_type}'
                         if not track_history[track_id].get(violation_key):
                             print(f"DEBUG: Triggering Async Report for {v_type} ID {track_id}")
-                            
-                            # Start background thread
-                            # Must copy frame because it's mutable and loop continues
                             frame_copy = frame.copy()
-                            threading.Thread(target=report_async, args=(video_id, v_type, track_id, frame_copy, speed, plate_text, class_name)).start()
-                                
-                            track_history[track_id][violation_key] = True 
+                            threading.Thread(
+                                target=report_async,
+                                args=(video_id, v_type, track_id, frame_copy, speed, plate_text, class_name, frame_time, confidence_score),
+                                daemon=True
+                            ).start()
+                            track_history[track_id][violation_key] = True
 
                 # Visualization
                 cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)

@@ -1,7 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
-import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Upload from './pages/Upload';
 import Admin from './pages/Admin';
@@ -9,83 +8,48 @@ import Challans from './pages/Challans';
 import Landing from './pages/Landing';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
-import { TokenManager } from './config/api';
-
-// Protected Route Component
-function ProtectedRoute({ children }) {
-  const isAuthenticated = TokenManager.hasToken();
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
-}
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Routes */}
+        {/* Public Routes - No Authentication Required */}
         <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-
-        {/* Protected Routes (Require Authentication) */}
+        
         <Route 
           path="/dashboard" 
-          element={
-            <ProtectedRoute>
-              <Layout><Dashboard /></Layout>
-            </ProtectedRoute>
-          } 
+          element={<Layout><Dashboard /></Layout>}
         />
         
         <Route 
           path="/live" 
-          element={
-            <ProtectedRoute>
-              <Layout><Upload /></Layout>
-            </ProtectedRoute>
-          } 
+          element={<Layout><Upload /></Layout>}
         />
         
         <Route 
           path="/admin" 
-          element={
-            <ProtectedRoute>
-              <Layout><Admin /></Layout>
-            </ProtectedRoute>
-          } 
+          element={<Layout><Admin /></Layout>}
         />
         
         <Route 
           path="/analytics" 
-          element={
-            <ProtectedRoute>
-              <Layout><Analytics /></Layout>
-            </ProtectedRoute>
-          } 
+          element={<Layout><Analytics /></Layout>}
         />
         
         <Route 
           path="/challans" 
-          element={
-            <ProtectedRoute>
-              <Layout><Challans /></Layout>
-            </ProtectedRoute>
-          } 
+          element={<Layout><Challans /></Layout>}
         />
         
         <Route 
           path="/settings" 
-          element={
-            <ProtectedRoute>
-              <Layout><Settings /></Layout>
-            </ProtectedRoute>
-          } 
+          element={<Layout><Settings /></Layout>}
         />
 
-        {/* Catch-all: redirect to dashboard if authenticated, else to login */}
+        {/* Catch-all: redirect to home */}
         <Route 
           path="*" 
-          element={
-            <Navigate to={TokenManager.hasToken() ? "/dashboard" : "/"} replace />
-          } 
+          element={<Navigate to="/" replace />}
         />
       </Routes>
     </BrowserRouter>

@@ -70,34 +70,37 @@ const Upload = () => {
     };
 
     React.useEffect(() => {
-        let interval;
+        // Poll the AI backend until at least one violation appears (max 60s)
+        let interval, timeoutId;
         if (result && !isDemo && result.video_id) {
-            interval = setInterval(async () => {
+            const poll = async () => {
                 try {
-                    // Poll the AI service directly since Vercel Backend MockDB is stateless and wipes memory instantly
                     const aiViolationsUrl = API_CONFIG.ENDPOINTS.AI_DETECT.replace('/detect', '/violations');
                     const res = await fetch(aiViolationsUrl);
                     if (res.ok) {
-                        const allViolations = await res.json();
-                        const videoViolations = allViolations.filter(v => v.video_id === result.video_id);
-                        if (videoViolations.length > 0) {
-                            setResult(prev => ({ ...prev, violations: videoViolations }));
-                            
-                            // Immediately persist to localStorage for Admin panel
-                            const localViolations = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
-                            const merged = [...localViolations];
-                            videoViolations.forEach(v => {
-                                if (!merged.find(m => m.id === v.id)) merged.push(v);
-                            });
+                        const all = await res.json();
+                        const videoV = all.filter(v => v.video_id === result.video_id);
+                        if (videoV.length > 0) {
+                            setResult(prev => ({ ...prev, violations: videoV }));
+                            // Persist locally
+                            const stored = JSON.parse(localStorage.getItem('traffic_violations') || '[]');
+                            const merged = [...stored];
+                            videoV.forEach(v => { if (!merged.find(m => m.id === v.id)) merged.push(v); });
                             localStorage.setItem('traffic_violations', JSON.stringify(merged));
+                            clearInterval(interval);
+                            clearTimeout(timeoutId);
                         }
                     }
-                } catch (e) {
-                    console.error("Polling error", e);
-                }
-            }, 3000);
+                } catch (_) {}
+            };
+            interval = setInterval(poll, 3000);
+            // Stop polling after 60s to avoid endless loops
+            timeoutId = setTimeout(() => clearInterval(interval), 60000);
         }
-        return () => clearInterval(interval);
+        return () => {
+            clearInterval(interval);
+            clearTimeout(timeoutId);
+        };
     }, [result?.video_id, isDemo]);
 
     // Save violation to backend database
@@ -133,11 +136,14 @@ const Upload = () => {
         formData.append('file', file);
 
         try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 120000); // 2 min timeout
             const res = await fetch(API_CONFIG.ENDPOINTS.AI_DETECT, {
                 method: 'POST',
                 body: formData,
-                signal: AbortSignal.timeout(120000), // 2 min timeout
+                signal: controller.signal,
             });
+            clearTimeout(timeout);
             clearInterval(interval);
             if (res.ok) {
                 const data = await res.json();
@@ -331,10 +337,13 @@ const Upload = () => {
                                 {/* Video stream */}
                                 {!isDemo && (
                                     <div ref={containerRef} className="glass-panel overflow-hidden aspect-video relative group">
-                                        <img
+                                        <video
                                             className="w-full h-full object-contain bg-black"
                                             src={getVideoUrl()}
-                                            alt="Live Analytics Feed"
+                                            autoPlay
+                                            muted
+                                            playsInline
+                                            controls={false}
                                             onError={() => {}}
                                         />
                                         <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1 bg-red-600/80 text-white text-xs font-bold rounded-full animate-pulse">

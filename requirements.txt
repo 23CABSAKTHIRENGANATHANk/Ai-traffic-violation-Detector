@@ -5,7 +5,7 @@ numpy==1.24.3
 scipy==1.10.1
 easyocr==1.7.0
 filterpy==1.4.5
-fastapi
-uvicorn
-python-multipart
-requests
+fastapi==0.104.1
+uvicorn==0.24.0
+python-multipart==0.0.6
+requests==2.31.0

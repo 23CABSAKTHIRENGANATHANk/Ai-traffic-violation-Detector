@@ -1,6 +1,7 @@
 {
     "version": 2,
-    "buildCommand": "npm install",
+    "buildCommand": "npm ci",
+    "installCommand": "npm ci",
     "env": {
         "DATABASE_URL": "@database_url",
         "DB_HOST": "@db_host",

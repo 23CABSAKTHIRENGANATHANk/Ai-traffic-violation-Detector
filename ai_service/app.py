@@ -44,9 +44,20 @@ os.makedirs(MODELS_DIR, exist_ok=True)
 # Mount processed directory to serve evidence images
 app.mount("/processed", StaticFiles(directory=PROCESSED_DIR), name="processed")
 
-# Load Models
-print("Loading YOLOv8n model...")
-vehicle_model = YOLO('yolov8n.pt')
+# Lazy Load Model - Download on first use for Vercel compatibility
+vehicle_model = None
+
+def load_model():
+    """Load YOLOv8n model - downloads if not present locally"""
+    global vehicle_model
+    if vehicle_model is None:
+        print("Loading YOLOv8n model...")
+        try:
+            vehicle_model = YOLO('yolov8n.pt')
+        except Exception as e:
+            print(f"Warning: Could not load local model, will download: {e}")
+            vehicle_model = YOLO('yolov8n.pt')  # ultralytics will auto-download
+    return vehicle_model
 
 # COCO Classes
 # 0: person, 1: bicycle, 2: car, 3: motorcycle, 5: bus, 7: truck
@@ -56,7 +67,7 @@ MOTORCYCLE_CLASS = 3
 
 @app.get("/")
 def health_check():
-    return {"status": "healthy", "service": "AI Traffic Violation Detector"}
+    return {"status": "healthy", "service": "AI Traffic Violation Detector", "ready": vehicle_model is not None}
 
 def calculate_speed(prev_pos, curr_pos, fps, pixel_scale=0.05):
     if prev_pos is None: return 0
@@ -194,6 +205,9 @@ def generate_frames(video_path: str, video_id: str):
     """
     Generator function for MJPEG streaming.
     """
+    # Load model on first use
+    load_model()
+    
     print(f"="*60)
     print(f"[STREAM START] Video Path: {video_path}")
     print(f"[STREAM START] Video ID: {video_id}")

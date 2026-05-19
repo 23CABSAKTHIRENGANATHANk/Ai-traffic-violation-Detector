@@ -1,11 +1,11 @@
-fastapi
-uvicorn
-python-multipart
+fastapi==0.104.1
+uvicorn==0.24.0
+python-multipart==0.0.6
 # Large dependencies (Risk of Vercel Size Limit Exceeded)
-ultralytics
-opencv-python-headless
-easyocr
-scipy
-pandas
-requests
-filterpy
+ultralytics==8.0.114
+opencv-python-headless==4.7.0.72
+easyocr==1.7.0
+scipy==1.10.1
+pandas==2.0.2
+requests==2.31.0
+filterpy==1.4.5

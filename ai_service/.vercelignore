@@ -1,21 +1,28 @@
-# AI Service Configuration
-__pycache__/
+# Dependencies (auto-installed by pip)
 venv/
 env/
-*.pyc
-*.pyo
+__pycache__/
+
+# Model files (auto-downloaded by ultralytics)
+yolov8n.pt
+runs/
+
+# Development files
 .env
 .env.local
 .DS_Store
+.git
+.gitignore
+docker*
 
-# Ignore large files
-uploads/
-processed/
+# Large media/data files
+uploads/*
+processed/*
 *.mp4
 *.avi
 *.mov
-yolov8n.pt
+*.log
 
-# Docker
-Dockerfile
-docker*
+# Documentation
+*.md
+tests/

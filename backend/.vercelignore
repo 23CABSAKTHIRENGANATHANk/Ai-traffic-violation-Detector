@@ -1,17 +1,20 @@
-# Backend Configuration
+# Dependencies (handled by npm ci)
 node_modules/
+npm-debug.log
+yarn-error.log
+
+# Development files
+.env
+.env.local
+.DS_Store
+.git
+.gitignore
+docker*
+docker-compose.yml
+nodemon.json
+*.test.js
+
+# Build artifacts
 dist/
 build/
 *.log
-.env
-.env.local
-
-# Files to ignore during Vercel deployment
-.git/
-.gitignore
-src/
-docker*
-docker-compose.yml
-scripts/
-database/
-nodemon.json
